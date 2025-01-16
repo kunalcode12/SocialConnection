@@ -32,6 +32,10 @@ exports.getAllComments = catchAsync(async (req, res, next) => {
   const contents = await Comment.find({ contentId: req.params.contentId })
     .sort('-createdAt')
     .populate({
+      path: 'userId',
+      select: 'name email',
+    })
+    .populate({
       path: 'replies.userId',
       select: 'name email',
     });

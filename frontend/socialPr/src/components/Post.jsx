@@ -30,6 +30,8 @@ import { setSavingSuccess } from "@/store/postSlice";
 import { unsavedPostApi } from "@/store/postSlice";
 import { useDispatch } from "react-redux";
 import { Alert, AlertDescription } from "./UI/Alerts";
+import CommentModal from "./CommentModel";
+import { getComments } from "@/store/commentSlice";
 
 function Post({ post, id, name }) {
   const [selectedPost, setSelectedPost] = useState(null);
@@ -84,6 +86,7 @@ function Post({ post, id, name }) {
 
   const openComments = (post) => {
     setSelectedPost(post);
+    dispatch(getComments(post._id));
   };
 
   const closeComments = () => {
@@ -264,83 +267,12 @@ function Post({ post, id, name }) {
         </CardContent>
       </Card>
 
-      <Modal open={selectedPost != null} onOpenChange={closeComments}>
-        <div className="w-3/5 bg-black flex items-center justify-center relative">
-          <video
-            src={selectedPost?.url}
-            alt={`Post image ${selectedPost?.url}`}
-            className="max-h-[80vh] object-contain"
-          ></video>
-        </div>
-
-        <div className="w-2/5 flex flex-col">
-          <header className="border-b p-4 flex items-center">
-            <Avatar className="w-8 h-8 mr-3">
-              <AvatarImage src={selectedPost?.user?.avatar} alt={name} />
-              <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <span className="font-semibold">{name}</span>
-          </header>
-          <div className="flex-grow overflow-y-auto p-4">
-            <p className="mb-4">
-              <span className="font-semibold mr-2">{name}</span>
-              {selectedPost?.description}
-            </p>
-            {/* Comments would go here */}
-          </div>
-          <div className="border-t p-4">
-            <div className="flex justify-between mb-4">
-              <div className="flex space-x-4">
-                <Button
-                  variant="secondary"
-                  className="bg-gray-200 hover:bg-gray-300"
-                  size="sm"
-                >
-                  <ArrowBigUp className="h-6 w-8 mr-1 hover:text-red-500 " />
-                  <span className="font-bold">{post.upVote}</span>
-                  <ArrowBigDown className="h-6 w-8 mr-1 hover:text-red-500" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="bg-gray-200 hover:bg-gray-300"
-                  size="sm"
-                >
-                  <MessageSquare className="h-4 w-4 mr-1" />
-                  <span>{selectedPost?.comments}</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="bg-gray-200 hover:bg-gray-300"
-                  size="sm"
-                >
-                  <Award className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="bg-gray-200 hover:bg-gray-300"
-                  size="sm"
-                >
-                  <Share2 className="h-4 w-4 mr-1" />
-                  <span>Share</span>
-                </Button>
-              </div>
-              <Bookmark />
-            </div>
-            <p className="font-semibold mb-2">{selectedPost?.likes} likes</p>
-            <p className="text-gray-500 text-xs uppercase">
-              {selectedPost?.createdAt}
-            </p>
-          </div>
-          <div className="border-t p-4 flex items-center">
-            <input
-              type="text"
-              placeholder="Add a comment..."
-              className="flex-grow border-none focus:ring-0"
-            />
-            <button className="text-blue-500 font-semibold">Post</button>
-          </div>
-        </div>
-      </Modal>
+      <CommentModal
+        post={selectedPost}
+        isOpen={selectedPost !== null}
+        onClose={closeComments}
+        userName={name}
+      />
     </>
   );
 }
