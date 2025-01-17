@@ -17,20 +17,48 @@ import {
   Heart,
   MessageCircle,
   X,
+  Trash2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { createComment } from "@/store/commentSlice";
+import { deleteComment } from "@/store/commentSlice";
+import { replyToComment } from "@/store/commentSlice";
 
 const CommentModal = ({ isOpen, onClose, userName, post }) => {
+  const dispatch = useDispatch();
+  const [newComment, setNewComment] = useState("");
   const [replyStates, setReplyStates] = useState({});
   const [replyTexts, setReplyTexts] = useState({});
   const { comments, loading, isError, success, errorMessage, successMessage } =
     useSelector((state) => state.comments);
 
+  const { user } = useSelector((state) => state.auth);
+  console.log(comments);
+
   const handleShowReplyInput = (commentId) => {
     setReplyStates((prev) => ({
       ...prev,
       [commentId]: !prev[commentId],
+    }));
+  };
+
+  const handleAddReply = (e, commentId) => {
+    e.preventDefault();
+
+    const replyText = replyTexts[commentId];
+
+    if (!replyText?.trim()) return;
+
+    dispatch(replyToComment(commentId, replyText));
+
+    setReplyTexts((prev) => ({
+      ...prev,
+      [commentId]: "",
+    }));
+    setReplyStates((prev) => ({
+      ...prev,
+      [commentId]: false,
     }));
   };
 
@@ -41,17 +69,31 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
     }));
   };
 
-  const handleAddReply = (e, commentId) => {
+  const handlePostComment = (e) => {
     e.preventDefault();
-    // Add reply logic here
-    setReplyTexts((prev) => ({
-      ...prev,
-      [commentId]: "",
-    }));
-    setReplyStates((prev) => ({
-      ...prev,
-      [commentId]: false,
-    }));
+
+    if (!newComment.trim()) return;
+
+    // Dispatch the action to post the comment
+    dispatch(createComment(post._id, newComment.trim()));
+
+    // Clear the input field
+    setNewComment("");
+  };
+
+  const handleDeleteComment = (commentId) => {
+    // Dispatch delete comment action
+    dispatch(deleteComment(commentId));
+  };
+
+  const isCommentOwner = (comment) => {
+    if (!user || !comment) return false;
+
+    // Handle both direct _id comparison and nested userId._id comparison
+    const commentUserId = comment.userId?._id || comment.userId;
+    const currentUserId = user._id;
+
+    return commentUserId === currentUserId;
   };
 
   if (!post) return null;
@@ -130,7 +172,7 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                     comments.map((comment) => (
                       <div
                         key={comment.id}
-                        className="flex items-start space-x-3 group"
+                        className="flex items-start space-x-3 group relative"
                       >
                         <Avatar className="w-8 h-8 ring-1 ring-blue-100">
                           <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
@@ -138,8 +180,8 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                          <div className="bg-gray-50 rounded-2xl px-4 py-2 shadow-sm">
-                            <p className="mb-1">
+                          <div className="bg-gray-50 rounded-2xl px-4 py-2 shadow-sm relative group">
+                            <p className="mb-1 pr-8">
                               <span className="font-bold text-gray-900 mr-2">
                                 {comment.userId?.name}
                               </span>
@@ -147,6 +189,15 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                                 {comment.comment}
                               </span>
                             </p>
+                            {isCommentOwner(comment) && (
+                              <button
+                                onClick={() => handleDeleteComment(comment._id)}
+                                className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1.5 hover:bg-red-50 rounded-full"
+                                title="Delete comment"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </button>
+                            )}
                           </div>
                           <div className="flex items-center space-x-4 text-xs mt-1.5 text-gray-500 pl-4">
                             <span>
@@ -273,17 +324,23 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
 
               {/* Comment Input */}
               <div className="border-t p-3 bg-white">
-                <form className="flex items-center bg-gray-50 rounded-full px-4 py-2 shadow-sm">
+                <form
+                  onSubmit={handlePostComment}
+                  className="flex items-center bg-gray-50 rounded-full px-4 py-2 shadow-sm"
+                >
                   <input
                     type="text"
                     placeholder="Add a comment..."
+                    value={newComment}
                     className="flex-grow bg-transparent border-none focus:outline-none focus:ring-0 text-sm"
+                    onChange={(e) => setNewComment(e.target.value)}
                   />
                   <Button
                     type="submit"
                     variant="ghost"
                     size="sm"
                     className="ml-2 text-blue-500 font-semibold hover:text-blue-600 hover:bg-transparent"
+                    disabled={loading || !newComment.trim()}
                   >
                     Post
                   </Button>

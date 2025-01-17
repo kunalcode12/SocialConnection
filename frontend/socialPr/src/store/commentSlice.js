@@ -14,7 +14,6 @@ export const commentSlice = createSlice({
   initialState: initialCommentState,
   reducers: {
     setComments: (state, action) => {
-      // Directly set the array of comments from data.data.data
       state.comments = action.payload.map((comment) => ({
         ...comment,
         userId: {
@@ -52,16 +51,42 @@ export const commentSlice = createSlice({
       const { commentId, reply } = action.payload;
       const comment = state.comments.find((c) => c._id === commentId);
       if (comment) {
+        // Initialize replies array if it doesn't exist
         if (!comment.replies) comment.replies = [];
-        comment.replies.push({
-          ...reply,
-          upVoteReply: 0,
-          createdAt: new Date().toISOString(),
-          _id: reply._id,
-          id: reply._id,
-        });
+
+        // Check if this reply ID already exists
+        const replyExists = comment.replies.some((r) => r._id === reply._id);
+
+        // Only add the reply if it doesn't already exist
+        if (!replyExists) {
+          comment.replies.push({
+            _id: reply._id,
+            commentId: reply.commentId,
+            reply: reply.reply,
+            upVoteReply: reply.upVoteReply || 0,
+            createdAt: reply.createdAt,
+            id: reply._id,
+            userId: {
+              _id: reply.userId._id,
+              name: reply.userId.name,
+              email: reply.userId.email,
+              id: reply.userId.id,
+            },
+          });
+        }
       }
     },
+
+    removeReply: (state, action) => {
+      const { commentId, replyId } = action.payload;
+      const comment = state.comments.find((c) => c._id === commentId);
+      if (comment && comment.replies) {
+        comment.replies = comment.replies.filter(
+          (reply) => reply._id !== replyId
+        );
+      }
+    },
+
     setSuccess: (state, action) => {
       state.success = true;
       state.successMessage = action.payload;
@@ -91,6 +116,7 @@ export const {
   addComment,
   removeComment,
   addReply,
+  removeReply,
   setError,
   setLoading,
   setSuccess,
@@ -117,7 +143,6 @@ export const getComments = (postId) => async (dispatch) => {
       throw new Error(data.message || "Failed to fetch comments");
     }
     console.log(data.data.data);
-    // Extract the comments array from the nested structure
     dispatch(setComments(data.data.data));
     dispatch(setSuccess("Comments fetched successfully"));
     dispatch(setLoading(false));
@@ -145,6 +170,7 @@ export const createComment = (postId, content) => async (dispatch) => {
       }
     );
     const data = await response.json();
+    console.log(data);
 
     if (!response.ok) {
       throw new Error(data.message || "Failed to create comment");
@@ -152,6 +178,7 @@ export const createComment = (postId, content) => async (dispatch) => {
 
     dispatch(addComment(data.data.data));
     dispatch(setSuccess("Comment created successfully"));
+    dispatch(setLoading(false));
     return data;
   } catch (error) {
     dispatch(setError(error.message));
@@ -165,7 +192,7 @@ export const deleteComment = (commentId) => async (dispatch) => {
   try {
     dispatch(setLoading(true));
     const response = await fetch(
-      `http://127.0.0.1:3000/api/v1/comment/deleteComment/${commentId}`,
+      `http://127.0.0.1:3000/api/v1/comment/getComment/${commentId}`,
       {
         method: "DELETE",
         headers: {
@@ -179,9 +206,11 @@ export const deleteComment = (commentId) => async (dispatch) => {
     if (!response.ok) {
       throw new Error(data.message || "Failed to delete comment");
     }
+    console.log(data);
 
     dispatch(removeComment(commentId));
     dispatch(setSuccess("Comment deleted successfully"));
+    dispatch(setLoading(false));
     return data;
   } catch (error) {
     dispatch(setError(error.message));
@@ -195,9 +224,9 @@ export const replyToComment = (commentId, content) => async (dispatch) => {
   try {
     dispatch(setLoading(true));
     const response = await fetch(
-      `http://127.0.0.1:3000/api/v1/comment/replyComment/${commentId}`,
+      `http://127.0.0.1:3000/api/v1/comment/reply/${commentId}`,
       {
-        method: "POST",
+        method: "PATCH",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
@@ -211,8 +240,48 @@ export const replyToComment = (commentId, content) => async (dispatch) => {
       throw new Error(data.message || "Failed to reply to comment");
     }
 
-    dispatch(addReply({ commentId, reply: data.data }));
+    const updatedComment = data.data.reply;
+
+    const newReply = updatedComment.replies[updatedComment.replies.length - 1];
+    console.log(newReply);
+
+    dispatch(
+      addReply({
+        commentId: updatedComment._id,
+        reply: newReply,
+      })
+    );
+
     dispatch(setSuccess("Reply added successfully"));
+    return data;
+  } catch (error) {
+    dispatch(setError(error.message));
+  } finally {
+    dispatch(setLoading(false));
+  }
+};
+
+export const deleteReply = (commentId, replyId) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+    const response = await fetch(
+      `http://127.0.0.1:3000/api/v1/comment/${commentId}/reply/${replyId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to delete reply");
+    }
+
+    dispatch(removeReply({ commentId, replyId }));
+    dispatch(setSuccess("Reply deleted successfully"));
     return data;
   } catch (error) {
     dispatch(setError(error.message));

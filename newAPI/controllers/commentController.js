@@ -11,12 +11,18 @@ exports.createComment = catchAsync(async (req, res, next) => {
     next(new AppError('No content found with given id', 404));
   }
   const { userId, comment } = req.body;
-  const createComment = await Comment.create({
+  let createComment = await Comment.create({
     contentId: id,
     userId,
     comment,
     //parentCommentId: parentCommentId || null,
   });
+
+  createComment = await createComment.populate({
+    path: 'userId',
+    select: 'name email',
+  });
+
   res.status(201).json({
     status: 'success',
     data: {
@@ -66,7 +72,7 @@ exports.addReplyToComment = catchAsync(async (req, res, next) => {
       $push: { replies: replyData },
     },
     { new: true }
-  );
+  ).populate({ path: 'replies.userId', select: 'name email' });
   res.status(201).json({
     status: 'success',
     data: {
@@ -117,28 +123,79 @@ exports.deleteComment = catchAsync(async (req, res, next) => {
   }
 });
 
+// exports.deleteReplyComment = catchAsync(async (req, res, next) => {
+//   req.body.userId = req.body.userId || req.user.id;
+
+//   const comment_id = req.params.commentId;
+//   const reply_id = req.params.replyId;
+
+//   if (!comment_id && !reply_id)
+//     next(new AppError('please provide comment and reply id', 403));
+
+//   const sameUser = await Comment.findById(comment_id);
+
+//   if (!sameUser || !sameUser.replies) {
+//     next(new AppError('No replies found or comment does not exist', 404));
+//   }
+
+//   const userReply = sameUser.replies.find(
+//     (el) =>
+//       el._id.toString() === reply_id && el.userId.toString() === req.body.userId
+//   );
+//   console.log(userReply);
+
+//   if (!userReply) {
+//     next(
+//       new AppError(
+//         'Reply not found or you do not have permission to delete it',
+//         403
+//       )
+//     );
+//   }
+
+//   const comment = await Comment.findOneAndUpdate(
+//     { _id: comment_id },
+//     { $pull: { replies: { _id: reply_id } } },
+//     { new: true }
+//   );
+
+//   if (!comment) {
+//     next(new AppError('Comment or reply not found', 404));
+//   }
+//   res.status(200).json({
+//     status: 'success',
+//     data: {
+//       message: 'reply in a comment deleted successfully',
+//     },
+//   });
+// });
+
 exports.deleteReplyComment = catchAsync(async (req, res, next) => {
   req.body.userId = req.body.userId || req.user.id;
 
   const comment_id = req.params.commentId;
   const reply_id = req.params.replyId;
 
-  if (!comment_id && !reply_id)
-    next(new AppError('please provide comment and reply id', 403));
+  if (!comment_id || !reply_id) {
+    return next(new AppError('Please provide comment and reply IDs', 403));
+  }
 
   const sameUser = await Comment.findById(comment_id);
 
   if (!sameUser || !sameUser.replies) {
-    next(new AppError('No replies found or comment does not exist', 404));
+    return next(
+      new AppError('No replies found or comment does not exist', 404)
+    );
   }
 
   const userReply = sameUser.replies.find(
     (el) =>
       el._id.toString() === reply_id && el.userId.toString() === req.body.userId
   );
+  console.log(userReply);
 
   if (!userReply) {
-    next(
+    return next(
       new AppError(
         'Reply not found or you do not have permission to delete it',
         403
@@ -153,12 +210,13 @@ exports.deleteReplyComment = catchAsync(async (req, res, next) => {
   );
 
   if (!comment) {
-    next(new AppError('Comment or reply not found', 404));
+    return next(new AppError('Comment or reply not found', 404));
   }
+
   res.status(200).json({
     status: 'success',
     data: {
-      message: 'reply in a comment deleted successfully',
+      message: 'Reply in a comment deleted successfully',
     },
   });
 });
