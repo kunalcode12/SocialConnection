@@ -32,6 +32,7 @@ import { useDispatch } from "react-redux";
 import { Alert, AlertDescription } from "./UI/Alerts";
 import CommentModal from "./CommentModel";
 import { getComments } from "@/store/commentSlice";
+import { getUserVotes } from "@/store/commentSlice";
 
 function Post({ post, id, name }) {
   const [selectedPost, setSelectedPost] = useState(null);
@@ -86,6 +87,7 @@ function Post({ post, id, name }) {
 
   const openComments = (post) => {
     setSelectedPost(post);
+    dispatch(getUserVotes(user._id));
     dispatch(getComments(post._id));
   };
 

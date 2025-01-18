@@ -7,6 +7,11 @@ const initialCommentState = {
   success: false,
   errorMessage: "",
   successMessage: "",
+  upvoteLoading: false,
+  userVotes: {
+    commentVotes: [],
+    replyVotes: [],
+  },
 };
 
 export const commentSlice = createSlice({
@@ -32,6 +37,22 @@ export const commentSlice = createSlice({
         })),
       }));
     },
+
+    setUserVotes: (state, action) => {
+      state.userVotes = {
+        commentVotes: action.payload.commentVotes.map((vote) => ({
+          commentId: vote.commentId._id,
+          voteType: vote.voteType,
+          userId: vote.userId,
+        })),
+        replyVotes: action.payload.replyVotes.map((vote) => ({
+          replyId: vote.replyId,
+          voteType: vote.voteType,
+          userId: vote.userId,
+        })),
+      };
+    },
+
     addComment: (state, action) => {
       state.comments.push({
         ...action.payload,
@@ -42,9 +63,15 @@ export const commentSlice = createSlice({
         __v: 0,
       });
     },
+
     removeComment: (state, action) => {
       state.comments = state.comments.filter(
         (comment) => comment._id !== action.payload
+      );
+
+      // Remove associated votes when comment is deleted
+      state.userVotes.commentVotes = state.userVotes.commentVotes.filter(
+        (vote) => vote.commentId !== action.payload
       );
     },
     addReply: (state, action) => {
@@ -84,7 +111,52 @@ export const commentSlice = createSlice({
         comment.replies = comment.replies.filter(
           (reply) => reply._id !== replyId
         );
+
+        // Remove associated votes when reply is deleted
+        state.userVotes.replyVotes = state.userVotes.replyVotes.filter(
+          (vote) => vote.replyId !== replyId
+        );
       }
+    },
+
+    updateCommentVote: (state, action) => {
+      const { commentId, voteType, userId } = action.payload;
+      const comment = state.comments.find((c) => c._id === commentId);
+
+      if (comment) {
+        // Update vote count
+        if (action.payload.message === "upvote removed successfull") {
+          comment.upVote = Math.max(0, (comment.upVote || 0) - 1);
+          // Remove vote from userVotes
+          state.userVotes.commentVotes = state.userVotes.commentVotes.filter(
+            (vote) => vote.commentId !== commentId
+          );
+        } else {
+          comment.upVote = (comment.upVote || 0) + 1;
+          // Add or update vote in userVotes
+          const existingVoteIndex = state.userVotes.commentVotes.findIndex(
+            (vote) => vote.commentId === commentId
+          );
+
+          if (existingVoteIndex >= 0) {
+            state.userVotes.commentVotes[existingVoteIndex] = {
+              commentId,
+              voteType,
+              userId,
+            };
+          } else {
+            state.userVotes.commentVotes.push({
+              commentId,
+              voteType,
+              userId,
+            });
+          }
+        }
+      }
+    },
+
+    setUpvoteLoading: (state, action) => {
+      state.upvoteLoading = action.payload;
     },
 
     setSuccess: (state, action) => {
@@ -121,6 +193,9 @@ export const {
   setLoading,
   setSuccess,
   resetStatus,
+  updateCommentVote,
+  setUpvoteLoading,
+  setUserVotes,
 } = commentSlice.actions;
 
 // Get all comments
@@ -142,7 +217,6 @@ export const getComments = (postId) => async (dispatch) => {
     if (!response.ok) {
       throw new Error(data.message || "Failed to fetch comments");
     }
-    console.log(data.data.data);
     dispatch(setComments(data.data.data));
     dispatch(setSuccess("Comments fetched successfully"));
     dispatch(setLoading(false));
@@ -286,6 +360,73 @@ export const deleteReply = (commentId, replyId) => async (dispatch) => {
   } catch (error) {
     dispatch(setError(error.message));
   } finally {
+    dispatch(setLoading(false));
+  }
+};
+
+export const upvoteComment = (commentId) => async (dispatch) => {
+  try {
+    dispatch(setUpvoteLoading(true));
+    const response = await fetch(
+      `http://127.0.0.1:3000/api/v1/votes/commentVote/${commentId}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ voteType: "upvote" }),
+      }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to upvote comment");
+    }
+
+    dispatch(
+      updateCommentVote({
+        commentId,
+        message: data.data.message,
+        voteType: data.data.data.voteType,
+      })
+    );
+
+    dispatch(setSuccess(data.data.message));
+    return data;
+  } catch (error) {
+    dispatch(setError(error.message));
+  } finally {
+    dispatch(setUpvoteLoading(false));
+  }
+};
+
+export const getUserVotes = (userId) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+    const response = await fetch(
+      `http://127.0.0.1:3000/api/v1/votes/userCommentVotes/${userId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to fetch user votes");
+    }
+
+    console.log(data.data);
+    dispatch(setUserVotes(data.data));
+    dispatch(setLoading(false));
+    dispatch(setSuccess(true));
+    return data;
+  } catch (error) {
+    dispatch(setError(error.message));
     dispatch(setLoading(false));
   }
 };

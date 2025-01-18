@@ -113,4 +113,57 @@ exports.createVoteOnComment = catchAsync(async (req, res, next) => {
   }
 });
 
+exports.getUserCommentAndReplyVotes = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Fetch votes on comments (commentId) by the user
+    const commentVotes = await Vote.find({
+      userId,
+      commentId: { $exists: true },
+    })
+      .select('commentId voteType userId')
+      .populate('commentId', 'contentId'); // Optional: Populate contentId for context
+
+    // Fetch votes on replies (replyId) by querying the Comment model
+    const commentsWithReplies = await Comment.find({
+      'replies.userId': userId,
+    }).select('replies');
+
+    // Filter the replies where the user has voted
+    const replyVotes = [];
+    commentsWithReplies.forEach((comment) => {
+      comment.replies.forEach((reply) => {
+        if (reply.userId.toString() === userId) {
+          replyVotes.push({
+            replyId: reply.commentId,
+            voteType: 'upvote',
+            userId: reply.userId,
+          });
+        }
+      });
+    });
+
+    // Prepare the combined result
+    const result = {
+      commentVotes: commentVotes.map((vote) => ({
+        commentId: vote.commentId,
+        voteType: vote.voteType,
+        userId: vote.userId,
+      })),
+      replyVotes,
+    };
+
+    res.status(200).json({
+      status: 'success',
+      data: result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'fail',
+      message: error.message,
+    });
+  }
+};
+
 exports.createVoteOnReplyOfComment = catchAsync(async (req, res, next) => {});

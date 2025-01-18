@@ -17,6 +17,10 @@ router
 //   .post(voteController.createVoteOnCommentReply);
 
 router
+  .route('/userCommentVotes/:userId')
+  .get(voteController.getUserCommentAndReplyVotes);
+
+router
   .route('/')
   .get(voteController.getAlltheVote)
   .post(authController.restrictTo('user'), voteController.createVote);
@@ -24,4 +28,5 @@ router
 router
   .route('/:id')
   .post(authController.restrictTo('user'), voteController.createVote);
+
 module.exports = router;

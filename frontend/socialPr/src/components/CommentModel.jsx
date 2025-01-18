@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,20 +21,31 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useDispatch, useSelector } from "react-redux";
-import { createComment } from "@/store/commentSlice";
+import { createComment, getUserVotes } from "@/store/commentSlice";
 import { deleteComment } from "@/store/commentSlice";
 import { replyToComment } from "@/store/commentSlice";
+import { deleteReply } from "@/store/commentSlice";
+import { upvoteComment } from "@/store/commentSlice";
 
 const CommentModal = ({ isOpen, onClose, userName, post }) => {
   const dispatch = useDispatch();
   const [newComment, setNewComment] = useState("");
   const [replyStates, setReplyStates] = useState({});
   const [replyTexts, setReplyTexts] = useState({});
-  const { comments, loading, isError, success, errorMessage, successMessage } =
-    useSelector((state) => state.comments);
+  const {
+    comments,
+    loading,
+    isError,
+    success,
+    errorMessage,
+    successMessage,
+    userVotes,
+  } = useSelector((state) => state.comments);
 
   const { user } = useSelector((state) => state.auth);
+
   console.log(comments);
+  console.log(userVotes);
 
   const handleShowReplyInput = (commentId) => {
     setReplyStates((prev) => ({
@@ -74,10 +85,8 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
 
     if (!newComment.trim()) return;
 
-    // Dispatch the action to post the comment
     dispatch(createComment(post._id, newComment.trim()));
 
-    // Clear the input field
     setNewComment("");
   };
 
@@ -86,14 +95,56 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
     dispatch(deleteComment(commentId));
   };
 
+  const handleDeleteReply = (commentId, replyId) => {
+    dispatch(deleteReply(commentId, replyId));
+  };
+
+  const handleUpvoteComment = (commentId) => {
+    dispatch(upvoteComment(commentId));
+  };
+
+  const hasUserUpvotedComment = (commentId) => {
+    return (
+      userVotes?.commentVotes?.some(
+        (vote) =>
+          vote.commentId === commentId &&
+          vote.userId === user?._id &&
+          vote.voteType === "upvote"
+      ) || false
+    );
+  };
+
+  // Function to check if user has upvoted a reply
+  const hasUserUpvotedReply = (replyId) => {
+    return (
+      userVotes?.replyVotes?.some(
+        (vote) =>
+          vote.replyId === replyId &&
+          vote.userId === user?._id &&
+          vote.voteType === "upvote"
+      ) || false
+    );
+  };
+  const handleUpvoteReply = (commentId, replyId) => {
+    // dispatch(upvoteReply(commentId, replyId));
+  };
+
   const isCommentOwner = (comment) => {
     if (!user || !comment) return false;
 
-    // Handle both direct _id comparison and nested userId._id comparison
     const commentUserId = comment.userId?._id || comment.userId;
     const currentUserId = user._id;
 
     return commentUserId === currentUserId;
+  };
+
+  const isReplyOwner = (reply) => {
+    if (!user || !reply) return false;
+
+    const replyUserId = reply.userId?._id || reply.userId;
+    const currentUserId = user._id;
+
+    return replyUserId === currentUserId;
   };
 
   if (!post) return null;
@@ -208,7 +259,27 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                                 }
                               )}
                             </span>
-                            <span>{comment.upVote} likes</span>
+                            <button
+                              onClick={() => handleUpvoteComment(comment._id)}
+                              className="flex items-center space-x-1 group"
+                            >
+                              <Heart
+                                className={`h-4 w-4 ${
+                                  hasUserUpvotedComment(comment._id)
+                                    ? "fill-red-500 text-red-500"
+                                    : "text-gray-400 group-hover:text-red-500"
+                                } transition-colors`}
+                              />
+                              <span
+                                className={`${
+                                  hasUserUpvotedComment(comment._id)
+                                    ? "text-red-500"
+                                    : "text-gray-500"
+                                } group-hover:text-red-500`}
+                              >
+                                {comment.upVote || 0}
+                              </span>
+                            </button>
                             <button
                               className="font-semibold hover:text-blue-600"
                               onClick={() => handleShowReplyInput(comment.id)}
@@ -264,8 +335,8 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                                       </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1">
-                                      <div className="bg-gray-50 rounded-2xl px-3 py-2 shadow-sm">
-                                        <p className="mb-1">
+                                      <div className="bg-gray-50 rounded-2xl px-3 py-2 shadow-sm relative group/reply">
+                                        <p className="mb-1 pr-8">
                                           <span className="font-bold text-gray-900 mr-2 text-sm">
                                             {reply.userId?.name}
                                           </span>
@@ -273,6 +344,20 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                                             {reply.reply}
                                           </span>
                                         </p>
+                                        {isReplyOwner(reply) && (
+                                          <button
+                                            onClick={() =>
+                                              handleDeleteReply(
+                                                comment._id,
+                                                reply._id
+                                              )
+                                            }
+                                            className="absolute right-2 top-2 opacity-0 group-hover/reply:opacity-100 transition-opacity duration-200 p-1.5 hover:bg-red-50 rounded-full"
+                                            title="Delete reply"
+                                          >
+                                            <Trash2 className="h-3 w-3 text-red-500" />
+                                          </button>
+                                        )}
                                       </div>
                                       <div className="flex items-center space-x-4 text-xs mt-1 text-gray-500 pl-3">
                                         <span>
@@ -283,7 +368,32 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                                             }
                                           )}
                                         </span>
-                                        <span>{reply.upVoteReply} likes</span>
+                                        <button
+                                          onClick={() =>
+                                            handleUpvoteReply(
+                                              comment._id,
+                                              reply._id
+                                            )
+                                          }
+                                          className="flex items-center space-x-1 group"
+                                        >
+                                          <Heart
+                                            className={`h-3 w-3 ${
+                                              hasUserUpvotedReply(reply._id)
+                                                ? "fill-red-500 text-red-500"
+                                                : "text-gray-400 group-hover:text-red-500"
+                                            } transition-colors`}
+                                          />
+                                          <span
+                                            className={`${
+                                              hasUserUpvotedReply(reply._id)
+                                                ? "text-red-500"
+                                                : "text-gray-500"
+                                            } group-hover:text-red-500`}
+                                          >
+                                            {reply.upVoteReply || 0}
+                                          </span>
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
