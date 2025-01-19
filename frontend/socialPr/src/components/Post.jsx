@@ -1,6 +1,5 @@
 import {
   ArrowBigUp,
-  ArrowBigDown,
   MessageSquare,
   Share2,
   Award,
@@ -9,9 +8,9 @@ import {
   Flag,
   Delete,
   BookmarkCheck,
+  Bookmark,
 } from "lucide-react";
-import { Heart, MessageCircle, Send, Bookmark } from "lucide-react";
-
+import { formatDistanceToNow } from "date-fns";
 import {
   Card,
   CardHeader,
@@ -21,20 +20,15 @@ import {
 } from "./UI/CardComp";
 import { Button } from "./UI/Button";
 import { Avatar, AvatarImage, AvatarFallback } from "./UI/Avatar";
-import Modal from "./UI/Modal";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { savePostApi } from "@/store/postSlice";
-import { setSavingSuccess } from "@/store/postSlice";
-import { unsavedPostApi } from "@/store/postSlice";
-import { useDispatch } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { savePostApi, unsavedPostApi } from "@/store/postSlice";
 import { Alert, AlertDescription } from "./UI/Alerts";
 import CommentModal from "./CommentModel";
-import { getComments } from "@/store/commentSlice";
-import { getUserVotes } from "@/store/commentSlice";
+import { getComments, getUserVotes } from "@/store/commentSlice";
 
-function Post({ post, id, name }) {
+const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
   const [selectedPost, setSelectedPost] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showError, setShowError] = useState(false);
@@ -44,17 +38,13 @@ function Post({ post, id, name }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { loading, savingSuccess, savingError, error } = useSelector(
+  const { loading, savingError, upvotedContent } = useSelector(
     (state) => state.post
   );
-  const { isAuthenticated, user, profileUser } = useSelector(
-    (state) => state.auth
-  );
-
-  console.log(post);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
 
   const sameUserPost = id === user?._id;
-
+  const isUpvoted = upvotedContent?.includes(post._id);
   const isBookmarked = user?.bookmarkedCont?.some(
     (bookmark) => bookmark.content._id === post._id
   );
@@ -72,37 +62,33 @@ function Post({ post, id, name }) {
     setShowDropdown(!showDropdown);
   };
 
-  console.log();
-
   const handleDropdownOptionClick = (option) => {
-    if (option === "delete" || option === "edit") {
-      navigate(isAuthenticated ? `/user/${id}` : "/");
-    }
-    if (option === "save") {
-      dispatch(savePostApi(post._id));
-    }
-    if (option === "unsave") {
-      dispatch(unsavedPostApi(post._id));
+    switch (option) {
+      case "delete":
+      case "edit":
+        navigate(isAuthenticated ? `/user/${id}` : "/");
+        break;
+      case "save":
+        dispatch(savePostApi(post._id));
+        break;
+      case "unsave":
+        dispatch(unsavedPostApi(post._id));
+        break;
     }
     setShowDropdown(false);
   };
 
-  const handleUpvote = () => {
-    // dispatch(upvotePost(post._id));
-  };
-
-  const handleDownvote = () => {
-    // dispatch(downvotePost(post._id));
+  const handleUpvote = (e) => {
+    e.preventDefault();
+    if (currentUser) onUpvote(post._id);
   };
 
   const openComments = (post) => {
     setSelectedPost(post);
-    dispatch(getUserVotes(user._id));
-    dispatch(getComments(post._id));
-  };
-
-  const closeComments = () => {
-    setSelectedPost(null);
+    if (user?._id) {
+      dispatch(getUserVotes(user._id));
+      dispatch(getComments(post._id));
+    }
   };
 
   useEffect(() => {
@@ -118,41 +104,49 @@ function Post({ post, id, name }) {
 
     if (showDropdown) {
       document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
   }, [showDropdown]);
+
+  const formattedDate = formatDistanceToNow(new Date(post.createdAt), {
+    addSuffix: true,
+  });
 
   return (
     <>
       {showError && (
-        <Alert className="fixed top-4 right-4 w-72 bg-red-100 border-red-400">
+        <Alert className="fixed top-4 right-4 w-72 bg-red-100 border-red-400 shadow-lg animate-fade-in">
           <AlertDescription>Unable to save the post</AlertDescription>
         </Alert>
       )}
-      <Card key={post.id} className="w-full max-w-2xl bg-white mb-4">
-        <CardHeader className="p-3 pb-0">
+      <Card className="w-full max-w-2xl bg-white mb-4 hover:shadow-lg transition-shadow duration-200 rounded-lg border border-gray-200">
+        <CardHeader className="p-4 pb-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Avatar className="w-6 h-6">
+            <div className="flex items-center space-x-3">
+              <Avatar className="w-8 h-8 ring-2 ring-gray-100">
                 <AvatarImage
-                  src="/placeholder.svg?height=24&width=24"
-                  alt="r/AskIndia"
+                  src="/placeholder.svg?height=32&width=32"
+                  alt={`${name}'s avatar`}
+                  className="object-cover"
                 />
-                <AvatarFallback>AI</AvatarFallback>
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                  {name.charAt(0)}
+                </AvatarFallback>
               </Avatar>
-              <div className="flex items-center text-sm">
+              <div className="flex flex-col">
                 <Link to={isAuthenticated ? `/user/${id}` : "/"}>
-                  <span className="font-medium hover:cursor-pointer hover:text-blue-600">
-                    by/{name}
+                  <span className="font-semibold text-gray-900 hover:text-blue-600 transition-colors">
+                    {name}
                   </span>
                 </Link>
-                <span className="mx-1 text-gray-500">•</span>
-                <span className="text-gray-500">{post.createdAt}</span>
-                <span className="mx-1 text-gray-500">•</span>
-                <span className="text-gray-500">Suggested</span>
+                <div className="flex items-center text-sm text-gray-500 space-x-2">
+                  <span>{formattedDate}</span>
+                  <span>•</span>
+                  <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs">
+                    Suggested
+                  </span>
+                </div>
               </div>
             </div>
             <div className="relative">
@@ -161,69 +155,60 @@ function Post({ post, id, name }) {
                 size="icon"
                 onClick={handleThreeDotClick}
                 ref={buttonRef}
+                className="hover:bg-gray-100 rounded-full"
               >
-                <MoreHorizontal className="h-4 w-4" />
+                <MoreHorizontal className="h-5 w-5" />
               </Button>
               {showDropdown && (
                 <div
                   ref={dropdownRef}
-                  className="absolute right-0 top-full mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
+                  className="absolute right-0 top-full mt-2 w-48 rounded-lg shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-10 overflow-hidden"
                 >
-                  <div
-                    className="py-1"
-                    role="menu"
-                    aria-orientation="vertical"
-                    aria-labelledby="options-menu"
-                  >
-                    {!sameUserPost && (
+                  <div className="py-1" role="menu">
+                    {!sameUserPost ? (
                       <>
-                        {isBookmarked ? (
-                          <button
-                            onClick={() => handleDropdownOptionClick("unsave")}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                            role="menuitem"
-                            disabled={loading}
-                          >
-                            <BookmarkCheck className="inline-block w-4 h-4 mr-2" />
-                            {loading ? "Saving..." : "Saved"}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleDropdownOptionClick("save")}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                            role="menuitem"
-                            disabled={loading}
-                          >
-                            <Bookmark className="inline-block w-4 h-4 mr-2" />
-                            {loading ? "Saving..." : "Save"}
-                          </button>
-                        )}
+                        <button
+                          onClick={() =>
+                            handleDropdownOptionClick(
+                              isBookmarked ? "unsave" : "save"
+                            )
+                          }
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          disabled={loading}
+                        >
+                          {isBookmarked ? (
+                            <BookmarkCheck className="w-4 h-4 mr-2 text-green-500" />
+                          ) : (
+                            <Bookmark className="w-4 h-4 mr-2" />
+                          )}
+                          {loading
+                            ? "Saving..."
+                            : isBookmarked
+                            ? "Saved"
+                            : "Save"}
+                        </button>
                         <button
                           onClick={() => handleDropdownOptionClick("report")}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                          role="menuitem"
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                          <Flag className="inline-block w-4 h-4 mr-2" />
+                          <Flag className="w-4 h-4 mr-2 text-red-500" />
                           Report
                         </button>
                       </>
-                    )}
-                    {sameUserPost && (
+                    ) : (
                       <>
                         <button
                           onClick={() => handleDropdownOptionClick("edit")}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                          role="menuitem"
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                          <Edit className="inline-block w-4 h-4 mr-2" />
+                          <Edit className="w-4 h-4 mr-2 text-blue-500" />
                           Edit
                         </button>
                         <button
                           onClick={() => handleDropdownOptionClick("delete")}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                          role="menuitem"
+                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
                         >
-                          <Delete className="inline-block w-4 h-4 mr-2" />
+                          <Delete className="w-4 h-4 mr-2" />
                           Delete
                         </button>
                       </>
@@ -234,56 +219,56 @@ function Post({ post, id, name }) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-3">
-          <CardTitle className="text-lg font-medium mb-2">
+        <CardContent className="p-4">
+          <CardTitle className="text-xl font-bold mb-3 text-gray-900">
             {post.title}
           </CardTitle>
-          <CardDescription className="text-base text-black">
+          <CardDescription className="text-base text-gray-700 leading-relaxed">
             {post.description}
           </CardDescription>
-          <div className="flex items-center space-x-2 mt-3">
+          <div className="flex items-center space-x-3 mt-4">
             <Button
-              variant="secondary"
-              className="bg-gray-200 hover:bg-gray-300"
-              size="sm"
+              variant="ghost"
+              className={`hover:bg-gray-100 rounded-full transition-colors ${
+                isUpvoted ? "bg-red-50" : ""
+              }`}
+              onClick={handleUpvote}
+              disabled={!currentUser}
             >
-              <div
-                className="flex items-center space-x-1 cursor-pointer group"
-                onClick={handleUpvote}
-              >
-                <ArrowBigUp className="h-6 w-8 group-hover:text-red-600" />
-                <span className="font-bold">{post.upVote}</span>
-              </div>
-              <div
-                className="flex items-center space-x-1 cursor-pointer group"
-                onClick={handleDownvote}
-              >
-                <ArrowBigDown className="h-6 w-8 group-hover:text-red-600" />
+              <div className="flex items-center space-x-2">
+                <ArrowBigUp
+                  className={`h-7 w-7 transition-colors ${
+                    isUpvoted
+                      ? "text-red-500"
+                      : "text-gray-500 group-hover:text-red-500"
+                  }`}
+                />
+                <span
+                  className={`font-bold ${
+                    isUpvoted ? "text-red-500" : "text-gray-700"
+                  }`}
+                >
+                  {post.upVote}
+                </span>
               </div>
             </Button>
             <Button
-              variant="secondary"
-              className="bg-gray-200 hover:bg-gray-300"
-              size="sm"
+              variant="ghost"
+              className="hover:bg-gray-100 rounded-full space-x-2"
               onClick={() => openComments(post)}
             >
-              <MessageSquare className="h-4 w-4 mr-1" />
-              <span>{post.comments}</span>
+              <MessageSquare className="h-5 w-5 text-gray-500" />
+              <span className="font-medium">{post.comments}</span>
+            </Button>
+            <Button variant="ghost" className="hover:bg-gray-100 rounded-full">
+              <Award className="h-5 w-5 text-gray-500" />
             </Button>
             <Button
-              variant="secondary"
-              className="bg-gray-200 hover:bg-gray-300"
-              size="sm"
+              variant="ghost"
+              className="hover:bg-gray-100 rounded-full space-x-2"
             >
-              <Award className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="secondary"
-              className="bg-gray-200 hover:bg-gray-300"
-              size="sm"
-            >
-              <Share2 className="h-4 w-4 mr-1" />
-              <span>Share</span>
+              <Share2 className="h-5 w-5 text-gray-500" />
+              <span className="font-medium">Share</span>
             </Button>
           </div>
         </CardContent>
@@ -292,11 +277,11 @@ function Post({ post, id, name }) {
       <CommentModal
         post={selectedPost}
         isOpen={selectedPost !== null}
-        onClose={closeComments}
+        onClose={() => setSelectedPost(null)}
         userName={name}
       />
     </>
   );
-}
+});
 
 export default Post;

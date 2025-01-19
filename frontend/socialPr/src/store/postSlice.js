@@ -3,6 +3,10 @@ import { createSlice } from "@reduxjs/toolkit";
 const initialPostState = {
   posts: [],
   recentPost: [],
+  upvotedContent: [],
+  upvotingLoading: false,
+  upvotingError: false,
+  upvotingSuccess: false,
   bookMarkedPost: null,
   loading: false,
   updatePostLoading: false,
@@ -47,7 +51,38 @@ export const postSlice = createSlice({
     deletePost: (state, action) => {
       state.posts = state.posts.filter((post) => post.id !== action.payload);
     },
+    setUpvotedContent: (state, action) => {
+      state.upvotedContent = action.payload;
+    },
+    setUpvotingLoading: (state, action) => {
+      state.upvotingLoading = action.payload;
+    },
+    setUpvotingError: (state, action) => {
+      state.upvotingError = action.payload;
+    },
+    setUpvotingSuccess: (state, action) => {
+      state.upvotingSuccess = action.payload;
+    },
+    updatePostUpvote: (state, action) => {
+      const postId = action.payload;
+      const post = state.posts.find((p) => p._id === postId);
 
+      if (post) {
+        const isUpvoted = state.upvotedContent.includes(postId);
+
+        if (isUpvoted) {
+          state.upvotedContent = state.upvotedContent.filter(
+            (id) => id !== postId
+          );
+
+          post.upVote = Math.max(0, post.upVote - 1);
+        } else {
+          state.upvotedContent.push(postId);
+
+          post.upVote += 1;
+        }
+      }
+    },
     setLoading: (state, action) => {
       state.loading = action.payload;
     },
@@ -100,8 +135,107 @@ export const {
   setSavingSuccess,
   setBookMarkedPost,
   deleteBookMark,
+  setUpvotedContent,
+  setUpvotingLoading,
+  setUpvotingError,
+  setUpvotingSuccess,
+  updatePostUpvote,
 } = postSlice.actions;
 export default postSlice.reducer;
+
+export const getAllContentApi = () => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+    const response = await fetch("http://127.0.0.1:3000/api/v1/content", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    const data = await response.json();
+
+    if (!response.ok)
+      throw new Error(data.message || "Failed to fetch content");
+
+    dispatch(setPosts(data.data.data));
+    dispatch(setLoading(false));
+    dispatch(setError(false));
+    dispatch(setSuccess(true));
+    return data;
+  } catch (error) {
+    console.log("Error fetching content:", error);
+    dispatch(setError(true));
+    dispatch(setSuccess(false));
+    dispatch(setError(error.message));
+    dispatch(setLoading(false));
+    throw error;
+  }
+};
+
+export const getUpvotedContentApi = (contentId) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+    const response = await fetch(
+      `http://127.0.0.1:3000/api/v1/votes/contentVote/${contentId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const data = await response.json();
+
+    if (!response.ok)
+      throw new Error(data.message || "Failed to fetch upvoted content");
+
+    dispatch(setUpvotedContent(data.data.content));
+    dispatch(setLoading(false));
+    dispatch(setError(false));
+    dispatch(setSuccess(true));
+    return data;
+  } catch (error) {
+    console.log("Error fetching upvoted content:", error);
+    dispatch(setError(true));
+    dispatch(setSuccess(false));
+    dispatch(setError(error.message));
+    dispatch(setLoading(false));
+    throw error;
+  }
+};
+
+export const upvoteContentApi = (contentId) => async (dispatch) => {
+  try {
+    dispatch(setUpvotingLoading(true));
+
+    const response = await fetch(`http://127.0.0.1:3000/api/v1/votes`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ voteType: "upvote", contentId: contentId }),
+    });
+    const data = await response.json();
+
+    if (!response.ok)
+      throw new Error(data.message || "Failed to upvote content");
+
+    dispatch(updatePostUpvote(data.data.data.contentId));
+    dispatch(setUpvotingLoading(false));
+    dispatch(setUpvotingError(false));
+    dispatch(setUpvotingSuccess(true));
+    return data;
+  } catch (error) {
+    console.log("Error upvoting content:", error);
+    dispatch(setUpvotingError(true));
+    dispatch(setUpvotingSuccess(false));
+    dispatch(setError(error.message));
+    dispatch(setUpvotingLoading(false));
+    throw error;
+  }
+};
 
 export const deletePostApi = (postID, token) => async (dispatch) => {
   try {

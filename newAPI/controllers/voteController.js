@@ -16,6 +16,41 @@ exports.getVoteContent = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getUserUpvotedContent = catchAsync(async (req, res, next) => {
+  // Get all upvotes by the user
+  if (!req.params.userId) {
+    req.params.userId = req.user.id;
+  }
+
+  const userVotes = await Vote.find({
+    userId: req.params.userId,
+    voteType: 'upvote',
+    contentId: { $exists: true }, // Only get content votes, not comment votes
+  });
+
+  // Extract content IDs from votes
+  const contentIds = userVotes.map((vote) => vote.contentId);
+
+  // If no upvoted content found
+  if (!contentIds.length) {
+    return res.status(200).json({
+      status: 'success',
+      results: 0,
+      data: {
+        content: [],
+      },
+    });
+  }
+
+  res.status(200).json({
+    status: 'success',
+    results: contentIds.length,
+    data: {
+      content: contentIds,
+    },
+  });
+});
+
 exports.getAlltheVote = catchAsync(async (req, res, next) => {
   const result = await Vote.find(req.query).populate({ path: 'userId' });
   res.status(200).json({

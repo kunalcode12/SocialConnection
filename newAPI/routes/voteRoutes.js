@@ -16,6 +16,10 @@ router
   .route('/comments/:commentId/replies/:replyId/vote')
   .post(voteController.createVoteOnReply);
 
+router
+  .route('/contentVote/:contentId')
+  .get(voteController.getUserUpvotedContent);
+
 // router
 //   .route('/commentVoteReply/:commentId')
 //   .post(voteController.createVoteOnCommentReply);
