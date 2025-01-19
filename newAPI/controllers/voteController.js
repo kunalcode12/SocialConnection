@@ -3,6 +3,7 @@ const Content = require('../models/contentModel');
 const Comment = require('../models/commentModel');
 const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
+const appError = require('../utils/appError');
 
 exports.getVoteContent = catchAsync(async (req, res, next) => {
   const { contentId } = req.query;
@@ -117,41 +118,31 @@ exports.getUserCommentAndReplyVotes = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Fetch votes on comments (commentId) by the user
     const commentVotes = await Vote.find({
       userId,
       commentId: { $exists: true },
+      replyId: { $exists: false },
     })
       .select('commentId voteType userId')
-      .populate('commentId', 'contentId'); // Optional: Populate contentId for context
+      .populate('commentId', 'contentId');
 
-    // Fetch votes on replies (replyId) by querying the Comment model
-    const commentsWithReplies = await Comment.find({
-      'replies.userId': userId,
-    }).select('replies');
+    const replyVotes = await Vote.find({
+      userId,
+      commentId: { $exists: true },
+      replyId: { $exists: true },
+    }).select('commentId replyId voteType userId');
 
-    // Filter the replies where the user has voted
-    const replyVotes = [];
-    commentsWithReplies.forEach((comment) => {
-      comment.replies.forEach((reply) => {
-        if (reply.userId.toString() === userId) {
-          replyVotes.push({
-            replyId: reply.commentId,
-            voteType: 'upvote',
-            userId: reply.userId,
-          });
-        }
-      });
-    });
-
-    // Prepare the combined result
     const result = {
       commentVotes: commentVotes.map((vote) => ({
         commentId: vote.commentId,
         voteType: vote.voteType,
         userId: vote.userId,
       })),
-      replyVotes,
+      replyVotes: replyVotes.map((vote) => ({
+        replyId: vote.replyId,
+        voteType: vote.voteType,
+        userId: vote.userId,
+      })),
     };
 
     res.status(200).json({
@@ -166,4 +157,82 @@ exports.getUserCommentAndReplyVotes = async (req, res) => {
   }
 };
 
-exports.createVoteOnReplyOfComment = catchAsync(async (req, res, next) => {});
+exports.createVoteOnReply = catchAsync(async (req, res, next) => {
+  if (!req.body.userId) {
+    req.body.userId = req.user.id;
+  }
+
+  const commentId = req.params.commentId;
+  const replyId = req.params.replyId;
+  const userId = req.body.userId;
+
+  // First verify the reply exists
+  const comment = await Comment.findOne({
+    _id: commentId,
+    'replies._id': replyId,
+  });
+
+  if (!comment) {
+    return next(new appError('Reply not found', 404));
+  }
+
+  // Find if user has already voted on this reply
+  const existingVote = await Vote.findOne({
+    commentId,
+    replyId,
+    userId,
+  });
+
+  if (!existingVote) {
+    // Create new vote
+    const vote = await Vote.create({
+      commentId, // Include both commentId and replyId
+      replyId,
+      userId,
+      voteType: 'upvote',
+    });
+
+    // Update the reply's upvote count
+    await Comment.findOneAndUpdate(
+      {
+        _id: commentId,
+        'replies._id': replyId,
+      },
+      {
+        $inc: { 'replies.$.upVoteReply': 1 },
+      },
+      { new: true }
+    );
+
+    return res.status(201).json({
+      status: 'success',
+      data: {
+        message: 'upvote added successfully',
+        data: vote,
+      },
+    });
+  } else {
+    // Remove existing vote
+    const vote = await Vote.findByIdAndDelete(existingVote._id);
+
+    // Decrease the reply's upvote count
+    await Comment.findOneAndUpdate(
+      {
+        _id: commentId,
+        'replies._id': replyId,
+      },
+      {
+        $inc: { 'replies.$.upVoteReply': -1 },
+      },
+      { new: true }
+    );
+
+    return res.status(201).json({
+      status: 'success',
+      data: {
+        message: 'upvote removed successfully',
+        data: vote,
+      },
+    });
+  }
+});

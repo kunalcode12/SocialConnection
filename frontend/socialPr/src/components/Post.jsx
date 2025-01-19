@@ -51,6 +51,8 @@ function Post({ post, id, name }) {
     (state) => state.auth
   );
 
+  console.log(post);
+
   const sameUserPost = id === user?._id;
 
   const isBookmarked = user?.bookmarkedCont?.some(
@@ -83,6 +85,14 @@ function Post({ post, id, name }) {
       dispatch(unsavedPostApi(post._id));
     }
     setShowDropdown(false);
+  };
+
+  const handleUpvote = () => {
+    // dispatch(upvotePost(post._id));
+  };
+
+  const handleDownvote = () => {
+    // dispatch(downvotePost(post._id));
   };
 
   const openComments = (post) => {
@@ -237,9 +247,19 @@ function Post({ post, id, name }) {
               className="bg-gray-200 hover:bg-gray-300"
               size="sm"
             >
-              <ArrowBigUp className="h-6 w-8 mr-1 hover:text-red-500 " />
-              <span className="font-bold">{post.upVote}</span>
-              <ArrowBigDown className="h-6 w-8 mr-1 hover:text-red-500" />
+              <div
+                className="flex items-center space-x-1 cursor-pointer group"
+                onClick={handleUpvote}
+              >
+                <ArrowBigUp className="h-6 w-8 group-hover:text-red-600" />
+                <span className="font-bold">{post.upVote}</span>
+              </div>
+              <div
+                className="flex items-center space-x-1 cursor-pointer group"
+                onClick={handleDownvote}
+              >
+                <ArrowBigDown className="h-6 w-8 group-hover:text-red-600" />
+              </div>
             </Button>
             <Button
               variant="secondary"

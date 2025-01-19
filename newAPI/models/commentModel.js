@@ -1,5 +1,30 @@
 const mongoose = require('mongoose');
 
+const replySchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'User',
+    required: [true, 'A reply must be by some user'],
+  },
+  commentId: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'Comment',
+    required: true,
+  },
+  reply: {
+    type: String,
+    required: true,
+  },
+  upVoteReply: {
+    type: Number,
+    default: 0,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
 const commentSchema = new mongoose.Schema(
   {
     contentId: {
@@ -20,34 +45,7 @@ const commentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-
-    replies: [
-      {
-        userId: {
-          type: mongoose.Schema.ObjectId,
-          ref: 'User',
-          required: [true, 'A reply must be by some user'],
-        },
-        commentId: {
-          type: mongoose.Schema.ObjectId,
-          ref: 'Comment',
-          required: true,
-        },
-        reply: {
-          type: String,
-          required: true,
-        },
-        upVoteReply: {
-          type: Number,
-          default: 0,
-        },
-
-        createdAt: {
-          type: Date,
-          default: new Date().getTime(),
-        },
-      },
-    ],
+    replies: [replySchema],
   },
   {
     toJSON: { virtuals: true },

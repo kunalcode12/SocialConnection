@@ -12,6 +12,10 @@ router
   .route('/commentVote/:commentId')
   .post(voteController.createVoteOnComment);
 
+router
+  .route('/comments/:commentId/replies/:replyId/vote')
+  .post(voteController.createVoteOnReply);
+
 // router
 //   .route('/commentVoteReply/:commentId')
 //   .post(voteController.createVoteOnCommentReply);

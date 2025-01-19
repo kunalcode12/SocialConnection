@@ -11,21 +11,20 @@ import {
   ArrowBigUp,
   ArrowBigDown,
   MessageSquare,
-  Share2,
-  Award,
-  Bookmark,
   Heart,
   MessageCircle,
   X,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useDispatch, useSelector } from "react-redux";
-import { createComment, getUserVotes } from "@/store/commentSlice";
+import { createComment, upvoteReply, resetStatus } from "@/store/commentSlice";
 import { deleteComment } from "@/store/commentSlice";
 import { replyToComment } from "@/store/commentSlice";
 import { deleteReply } from "@/store/commentSlice";
 import { upvoteComment } from "@/store/commentSlice";
+import { Alert, AlertDescription } from "./UI/Alerts";
 
 const CommentModal = ({ isOpen, onClose, userName, post }) => {
   const dispatch = useDispatch();
@@ -40,12 +39,22 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
     errorMessage,
     successMessage,
     userVotes,
+    upvoteLoading,
   } = useSelector((state) => state.comments);
 
   const { user } = useSelector((state) => state.auth);
 
-  console.log(comments);
-  console.log(userVotes);
+  useEffect(() => {
+    return () => {
+      dispatch(resetStatus());
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      dispatch(resetStatus());
+    }
+  }, [isOpen, dispatch]);
 
   const handleShowReplyInput = (commentId) => {
     setReplyStates((prev) => ({
@@ -53,6 +62,15 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
       [commentId]: !prev[commentId],
     }));
   };
+
+  useEffect(() => {
+    if (isError || success) {
+      const timer = setTimeout(() => {
+        dispatch(resetStatus());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isError, success, dispatch]);
 
   const handleAddReply = (e, commentId) => {
     e.preventDefault();
@@ -103,6 +121,10 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
     dispatch(upvoteComment(commentId));
   };
 
+  const handleUpvoteReply = (commentId, replyId) => {
+    dispatch(upvoteReply(commentId, replyId));
+  };
+
   const hasUserUpvotedComment = (commentId) => {
     return (
       userVotes?.commentVotes?.some(
@@ -124,9 +146,6 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
           vote.voteType === "upvote"
       ) || false
     );
-  };
-  const handleUpvoteReply = (commentId, replyId) => {
-    // dispatch(upvoteReply(commentId, replyId));
   };
 
   const isCommentOwner = (comment) => {
@@ -154,6 +173,20 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
       <DialogPortal>
         <DialogOverlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-5xl z-50 bg-transparent border-none shadow-none p-0 gap-0 outline-none">
+          {(isError || success) && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-96">
+              {isError && (
+                <Alert variant="destructive" className="mb-2">
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+              )}
+              {success && (
+                <Alert className="bg-green-50 border-green-200 text-green-800">
+                  <AlertDescription>{successMessage}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
           <div className="relative flex flex-col md:flex-row h-[85vh] md:h-[75vh] bg-white rounded-xl overflow-hidden shadow-2xl">
             {/* Close button */}
             <button
