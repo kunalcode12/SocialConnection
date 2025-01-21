@@ -1,45 +1,50 @@
 import RecentPosts from "../components/RecentPosts";
 import Posts from "../components/Posts";
 import { json, useLocation } from "react-router-dom";
-import { useCallback, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getAllContentApi,
   getUpvotedContentApi,
-  upvoteContentApi,
-} from "../store/postSlice"; // Adjust the import path as needed
+  setPosts,
+} from "../store/postSlice";
 
 export default function HomePage({ popularData }) {
   const location = useLocation();
   const dispatch = useDispatch();
+  const isPopular = location.pathname === "/popular";
 
-  const reduxPosts = useSelector((state) => state.post.posts);
-  const loading = useSelector((state) => state.post.loading);
-  const error = useSelector((state) => state.post.error);
+  const {
+    posts: reduxPosts,
+    loading,
+    error,
+    upvotedContent,
+  } = useSelector((state) => state.post);
   const user = useSelector((state) => state.auth.user);
-  const upvotedContent = useSelector((state) => state.post.upvotedContent);
 
+  // Effect to handle data fetching and population
   useEffect(() => {
-    const fetchInitialData = () => {
+    if (isPopular && popularData) {
+      console.log(popularData);
+      dispatch(setPosts(popularData.data.data));
+    } else {
       dispatch(getAllContentApi());
-      if (user?._id) {
-        dispatch(getUpvotedContentApi(user._id));
+    }
+
+    if (user?._id) {
+      dispatch(getUpvotedContentApi(user._id));
+    }
+
+    return () => {
+      if (isPopular) {
+        dispatch(setPosts([]));
       }
     };
-    fetchInitialData();
-  }, [dispatch, user?._id]);
+  }, [dispatch, isPopular, popularData, user?._id]);
 
-  const { posts, isPopular } = useMemo(() => {
-    const isPopular = location.pathname === "/popular";
-    const rawData = isPopular ? popularData : { data: reduxPosts };
-
-    const filteredPosts = {
-      ...rawData,
-      data: rawData.data?.filter((post) => post?.user?.active) || [],
-    };
-
-    return { posts: filteredPosts, isPopular };
-  }, [location.pathname, popularData, reduxPosts]);
+  const filteredPosts = useMemo(() => {
+    return reduxPosts?.filter((post) => post?.user?.active) || [];
+  }, [reduxPosts]);
 
   if (loading && !isPopular) {
     return (
@@ -63,8 +68,7 @@ export default function HomePage({ popularData }) {
         <main className="flex-1 ml-56">
           <div className="container mx-auto px-4 py-8 flex relative">
             <Posts
-              posts={posts}
-              // onUpvote={handleUpvote}
+              posts={filteredPosts}
               upvotedContent={upvotedContent}
               currentUser={user}
             />
@@ -78,7 +82,6 @@ export default function HomePage({ popularData }) {
   );
 }
 
-// The loader function can still be used for the popular route or as a fallback
 export async function loader() {
   const response = await fetch("http://127.0.0.1:3000/api/v1/content");
   const data = await response.json();

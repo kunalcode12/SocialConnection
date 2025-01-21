@@ -3,6 +3,7 @@ import { authSlice } from "./authSlice";
 import { postSlice } from "./postSlice";
 import { commentSlice } from "./commentSlice";
 import { userUpdateSlice } from "./userUpdateSlice";
+import { followSlice } from "./followSlice";
 
 const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ const store = configureStore({
     post: postSlice.reducer,
     userUpdate: userUpdateSlice.reducer,
     comments: commentSlice.reducer,
+    follow: followSlice.reducer,
   },
 });
 

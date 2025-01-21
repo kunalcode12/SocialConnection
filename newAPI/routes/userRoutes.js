@@ -14,6 +14,16 @@ router.use(authController.protect);
 router.patch('/updateMyPassword', authController.updatePassword);
 
 router
+  .route('/:userId/followersAndFollowAndUnfollow')
+  .get(userController.getFollowers)
+  .post(userController.followUser);
+
+router.route('/:userId/unfollow').delete(userController.unfollowUser);
+
+router.route('/:userId/following').get(userController.getFollowing);
+router.route('/:userid/follower-stats').get(userController.getFollowerStats);
+
+router
   .route('/bookmark/:contentId')
   .post(userController.addBookmarks)
   .delete(userController.removeBookmarks);

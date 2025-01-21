@@ -53,7 +53,6 @@ const UserPost = memo(({ post, id, name, className, isbookMarkedPost }) => {
   const { user, token } = useSelector((state) => state.auth);
 
   const sameUserPost = id === user?._id;
-  console.log(id, user?._id);
 
   const handleThreeDotClick = useCallback((e) => {
     e.stopPropagation();

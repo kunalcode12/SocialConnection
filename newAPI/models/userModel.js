@@ -26,6 +26,18 @@ const userSchema = new mongoose.Schema(
       minlength: 8,
       select: false,
     },
+    followers: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User',
+      },
+    ],
+    following: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User',
+      },
+    ],
     bookmarkedCont: [
       {
         content: {
@@ -65,6 +77,10 @@ const userSchema = new mongoose.Schema(
 //   });
 //   next();
 // });
+
+userSchema.methods.isFollowing = function (userId) {
+  return this.following.some((id) => id.equals(userId));
+};
 
 userSchema.virtual('contents', {
   ref: 'Content',

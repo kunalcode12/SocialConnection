@@ -1,6 +1,5 @@
 const Content = require('../models/contentModel');
 const User = require('../models/userModel');
-const { use } = require('../routes/commentRoutes');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 
@@ -196,5 +195,144 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
   res.status(204).json({
     status: 'success',
     data: null,
+  });
+});
+
+exports.getFollowers = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.params.userId)
+    .populate('followers', 'name _id email')
+    .select('followers');
+
+  if (!user) {
+    return next(new AppError('No user found with that ID', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    results: user.followers.length,
+    data: {
+      followers: user.followers,
+    },
+  });
+});
+
+exports.getFollowing = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.params.userId)
+    .populate('following', 'name _id email')
+    .select('following');
+
+  if (!user) {
+    return next(new AppError('No user found with that ID', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    results: user.following.length,
+    data: {
+      following: user.following,
+    },
+  });
+});
+
+exports.followUser = catchAsync(async (req, res, next) => {
+  // Check if trying to follow self
+  if (req.params.userId === req.user.id) {
+    return next(new AppError('You cannot follow yourself', 400));
+  }
+
+  const userToFollow = await User.findById(req.params.userId);
+  const currentUser = await User.findById(req.user.id);
+
+  if (!userToFollow) {
+    return next(new AppError('No user found with that ID', 404));
+  }
+
+  // Check if already following
+  if (currentUser.isFollowing(userToFollow._id)) {
+    return next(new AppError('You are already following this user', 400));
+  }
+
+  // Add to following list of current user
+  await User.findByIdAndUpdate(
+    req.user.id,
+    { $push: { following: userToFollow._id } },
+    { new: true, runValidators: true }
+  );
+
+  // Add to followers list of target user
+  const updatedUserToFollow = await User.findByIdAndUpdate(
+    req.params.userId,
+    { $push: { followers: req.user.id } },
+    { new: true, runValidators: true }
+  );
+
+  res.status(200).json({
+    status: 'success',
+    message: `You are now following ${updatedUserToFollow.name}`,
+    data: {
+      following: updatedUserToFollow,
+    },
+  });
+});
+
+exports.unfollowUser = catchAsync(async (req, res, next) => {
+  // Check if trying to unfollow self
+  if (req.params.userId === req.user.id) {
+    return next(new appError('You cannot unfollow yourself', 400));
+  }
+
+  const userToUnfollow = await User.findById(req.params.userId);
+  const currentUser = await User.findById(req.user.id);
+
+  if (!userToUnfollow) {
+    return next(new AppError('No user found with that ID', 404));
+  }
+
+  // Check if actually following
+  if (!currentUser.isFollowing(userToUnfollow._id)) {
+    return next(new AppError('You are not following this user', 400));
+  }
+
+  // Remove from following list of current user
+  await User.findByIdAndUpdate(
+    req.user.id,
+    { $pull: { following: userToUnfollow._id } },
+    { new: true, runValidators: true }
+  );
+
+  // Remove from followers list of target user
+  const updatedUserToUnfollow = await User.findByIdAndUpdate(
+    req.params.userId,
+    { $pull: { followers: req.user.id } },
+    { new: true, runValidators: true }
+  );
+
+  res.status(200).json({
+    status: 'success',
+    message: `You have unfollowed ${updatedUserToUnfollow.name}`,
+    data: {
+      unfollowed: updatedUserToUnfollow,
+    },
+  });
+});
+
+// Optional: Get follower stats
+exports.getFollowerStats = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.params.userId).select(
+    'followers following'
+  );
+
+  if (!user) {
+    return next(new appError('No user found with that ID', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      stats: {
+        followersCount: user.followers.length,
+        followingCount: user.following.length,
+      },
+    },
   });
 });

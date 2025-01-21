@@ -5,7 +5,7 @@ import { upvoteContentApi } from "@/store/postSlice";
 
 const Posts = memo(function Posts({ posts, currentUser }) {
   const dispatch = useDispatch();
-  const postmain = posts.data;
+  const postmain = posts;
 
   const handleUpvote = useCallback(
     (postId) => {
