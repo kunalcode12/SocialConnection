@@ -23,7 +23,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
-import { Link, useParams, useLocation } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import { fetchUserData } from "../store/authSlice";
 import { useEffect } from "react";
 import LoadingBar from "../components/UI/LoadingBar";
@@ -57,6 +57,7 @@ export default function UserProfile() {
   const [showFollowDialog, setShowFollowDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("followers");
   const [followInProgress, setFollowInProgress] = useState(false);
+  const navigate = useNavigate();
 
   const token = localStorage.getItem("token");
 
@@ -109,6 +110,12 @@ export default function UserProfile() {
       setFollowInProgress(false);
     }
   };
+
+  const handleClick = (userID) => {
+    navigate(`/user/${userID}`);
+    setShowFollowDialog(false);
+  };
+
   useEffect(() => {
     if (userId) {
       dispatch(fetchUserData(userId, token));
@@ -187,7 +194,7 @@ export default function UserProfile() {
               </Avatar>
               <div>
                 <p className="font-medium text-sm">{follower.name}</p>
-                <p className="text-sm text-gray-500">@{follower.username}</p>
+                {/* <p className="text-sm text-gray-500">@{follower.username}</p> */}
               </div>
             </div>
             {user._id !== follower._id && (
@@ -195,13 +202,9 @@ export default function UserProfile() {
                 variant="outline"
                 size="sm"
                 className="rounded-full hover:bg-gray-100"
-                onClick={() => handleFollowToggle(follower._id)}
+                onClick={() => handleClick(follower._id)}
               >
-                {followInProgress
-                  ? "Processing..."
-                  : isCurrentUserFollowing
-                  ? "Following"
-                  : "Follow"}
+                View Profile
               </Button>
             )}
           </div>
