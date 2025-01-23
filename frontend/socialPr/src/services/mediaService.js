@@ -94,18 +94,27 @@ export const mediaService = {
   // Upload chunk
   uploadChunk: async (chunk, chunkIndex, uploadId, totalChunks) => {
     const formData = new FormData();
-    formData.append("chunk", chunk);
-    formData.append("chunkIndex", chunkIndex);
+
+    // Ensure chunk is added correctly
+    formData.append("chunk", chunk, `chunk-${chunkIndex}`);
     formData.append("uploadId", uploadId);
     formData.append("totalChunks", totalChunks);
+    formData.append("chunkIndex", chunkIndex);
+
+    console.log("Frontend Chunk:", chunk);
+    console.log("Frontend ChunkIndex:", chunkIndex);
+    console.log("Frontend UploadId:", uploadId);
+    console.log("Frontend TotalChunks:", totalChunks);
 
     const response = await fetch(`${API_URL}/media/chunk`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
+        // Do NOT set Content-Type, let browser set it for FormData
       },
       body: formData,
     });
+
     return handleResponse(response);
   },
 

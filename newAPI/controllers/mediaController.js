@@ -7,6 +7,11 @@ const appError = require('../utils/appError');
 const mongoose = require('mongoose');
 const redis = require('redis');
 const { promisify } = require('util');
+const multer = require('multer');
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max file size
+});
 
 const redisClient = redis.createClient(process.env.REDIS_URL);
 const getCache = promisify(redisClient.get).bind(redisClient);
@@ -217,7 +222,6 @@ exports.initializeUpload = catchAsync(async (req, res, next) => {
     totalChunks,
     metadata,
     user: req.user._id,
-    content: contentId,
     status: 'uploading',
   });
 
@@ -231,31 +235,64 @@ exports.initializeUpload = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.uploadChunk = catchAsync(async (req, res, next) => {
-  const { uploadId, chunkIndex, totalChunks } = req.body;
-  const chunk = req.file.buffer;
+exports.uploadChunk = (req, res, next) => {
+  upload.single('chunk')(req, res, async (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Multer upload error: ${err.message}`,
+      });
+    }
 
-  const media = await Media.findOne({ uploadId });
-  if (!media) {
-    return next(new appError('Upload not found', 404));
-  }
+    if (err) {
+      return res.status(500).json({
+        status: 'error',
+        message: `Upload error: ${err.message}`,
+      });
+    }
 
-  const result = await uploadService.handleChunk(
-    chunk,
-    uploadId,
-    parseInt(chunkIndex),
-    parseInt(totalChunks),
-    media
-  );
+    try {
+      const { uploadId, chunkIndex, totalChunks } = req.body;
+      const chunk = req.file ? req.file.buffer : null;
 
-  res.status(200).json({
-    status: 'success',
-    data: result,
+      if (!uploadId || chunkIndex === undefined || totalChunks === undefined) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Missing required upload parameters',
+        });
+      }
+
+      if (!chunk || chunk.length === 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'No chunk data received',
+        });
+      }
+
+      const result = await uploadService.handleChunk(
+        chunk,
+        uploadId,
+        chunkIndex,
+        totalChunks
+      );
+
+      res.status(200).json({
+        status: 'success',
+        data: result,
+      });
+    } catch (error) {
+      console.error('Chunk upload error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: error.message || 'Chunk upload failed',
+      });
+    }
   });
-});
+};
 
 exports.getUploadStatus = catchAsync(async (req, res, next) => {
   const { uploadId } = req.params;
+
   const media = await Media.findOne({ uploadId })
     .select('status uploadedChunks totalChunks url')
     .lean();
@@ -264,12 +301,24 @@ exports.getUploadStatus = catchAsync(async (req, res, next) => {
     return next(new appError('Upload not found', 404));
   }
 
+  // Calculate progress
+  const progress = media.uploadedChunks
+    ? (media.uploadedChunks.length / media.totalChunks) * 100
+    : 0;
+
+  console.log('Media Status:', {
+    status: media.status,
+    uploadedChunksCount: media.uploadedChunks?.length || 0,
+    totalChunks: media.totalChunks,
+    progress,
+  });
+
   res.status(200).json({
     status: 'success',
     data: {
       status: media.status,
-      progress: (media.uploadedChunks.length / media.totalChunks) * 100,
-      url: media.url,
+      progress,
+      url: media.url || null,
     },
   });
 });

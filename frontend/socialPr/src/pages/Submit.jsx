@@ -7,6 +7,7 @@ import {
   Video,
   Send,
   Eye,
+  X,
 } from "lucide-react";
 import { Button } from "../components/UI/Button";
 import { Input } from "../components/UI/Input";
@@ -21,33 +22,163 @@ import { addPost, setLoading, setError } from "../store/postSlice";
 import { useSelector } from "react-redux";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { mediaService } from "@/services/mediaService";
 
 const EnhancedSubmitPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { token } = useSelector((state) => state.auth);
+
+  // State variables
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [link, setLink] = useState("");
   const [file, setFile] = useState(null);
   const [activeButton, setActiveButton] = useState("post");
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const fileInputRef = useRef(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const navigate = useNavigate();
-  const { token } = useSelector((state) => state.auth);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedMediaUrl, setUploadedMediaUrl] = useState(null);
 
+  const fileInputRef = useRef(null);
   const loading = useSelector((state) => state.post.loading);
 
-  const baseClasses =
-    "ml-10 w-[800px] py-2 flex h-14 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-offset-2";
-  const variantClasses = {
-    default: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500",
-    outline:
-      "border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-blue-500",
+  // Chunk file into smaller pieces
+  const chunkFile = (file) => {
+    const chunks = [];
+    const chunkSize = 1024 * 1024; // 1MB chunks
+
+    for (let i = 0; i < file.size; i += chunkSize) {
+      const chunk = file.slice(i, i + chunkSize);
+      if (chunk.size > 0) {
+        chunks.push(chunk);
+      }
+    }
+
+    return chunks;
   };
 
+  // Media upload handler
+  const handleMediaUpload = async (selectedFile) => {
+    try {
+      // Initialize upload
+      const initResult = await mediaService.initializeUpload({
+        title: selectedFile.name,
+        type: selectedFile.type.startsWith("image/") ? "image" : "video",
+        totalChunks: Math.ceil(selectedFile.size / (1024 * 1024)),
+        metadata: {
+          size: selectedFile.size,
+          contentType: selectedFile.type,
+          filename: selectedFile.name,
+        },
+      });
+
+      const { uploadId, totalChunks } = initResult.data;
+      const chunks = chunkFile(selectedFile);
+
+      // Upload chunks
+      for (let i = 0; i < chunks.length; i++) {
+        await mediaService.uploadChunk(chunks[i], i, uploadId, totalChunks);
+        setUploadProgress(((i + 1) / chunks.length) * 100);
+      }
+
+      // Get final upload status
+      const statusResponse = await fetch(
+        `http://127.0.0.1:3000/api/v1/media/status/${uploadId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      const statusData = await statusResponse.json();
+
+      setUploadedMediaUrl(statusData.data.url);
+      return statusData.data.url;
+    } catch (error) {
+      console.error("Media upload failed:", error);
+      setErrorMessage(error.message);
+      return null;
+    }
+  };
+
+  // File change handler
+  const handleFileChange = async (e) => {
+    const selectedFile = e.target.files?.[0];
+    console.log(selectedFile);
+    if (selectedFile) {
+      setUploadProgress(0);
+      setUploadedMediaUrl(null);
+      setFile(selectedFile);
+
+      // Automatically start upload
+      await handleMediaUpload(selectedFile);
+    }
+  };
+
+  // Submit handler
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isSubmitEnabled) {
+      dispatch(setLoading(true));
+      try {
+        // Prepare post data
+        const postData = {
+          title: title,
+          description: content,
+          url: link || uploadedMediaUrl,
+          category: "education",
+          ...(activeButton === "image" && { image: uploadedMediaUrl }),
+          ...(activeButton === "video" && { video: uploadedMediaUrl }),
+        };
+
+        const response = await fetch("http://127.0.0.1:3000/api/v1/content", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(postData),
+        });
+
+        const responseData = await response.json();
+        if (!response.ok) {
+          throw new Error(responseData.message || "Failed to create post");
+        }
+
+        dispatch(addPost(responseData.data.data));
+        console.log("Post created:", responseData.data.data);
+        alert("Post submitted successfully!");
+
+        // Reset form
+        setTitle("");
+        setContent("");
+        setLink("");
+        setFile(null);
+        setUploadedMediaUrl(null);
+        setUploadProgress(0);
+
+        navigate(`/user/${responseData.data.data.user}`);
+      } catch (error) {
+        console.error("Error creating post:", error);
+        dispatch(setError(error.message));
+        setErrorMessage("Unable to create a post");
+      } finally {
+        dispatch(setLoading(false));
+      }
+    }
+  };
+
+  // Memoized submit button state
   const isSubmitEnabled = useMemo(() => {
-    return title.trim().length > 1 && content.trim().length > 1;
-  }, [title, content]);
+    return (
+      title.trim().length > 1 &&
+      (content.trim().length > 1 ||
+        (activeButton === "image" && uploadedMediaUrl) ||
+        (activeButton === "video" && uploadedMediaUrl) ||
+        (activeButton === "link" && link.trim().length > 0))
+    );
+  }, [title, content, activeButton, uploadedMediaUrl, link]);
 
   const submitButtonClass = useMemo(() => {
     const baseClass = "flex items-center";
@@ -57,71 +188,15 @@ const EnhancedSubmitPage = () => {
     return `${baseClass} ${isSubmitEnabled ? enabledClass : disabledClass}`;
   }, [isSubmitEnabled]);
 
-  useEffect(() => {
-    if (errorMessage) {
-      const timer = setTimeout(() => {
-        setErrorMessage("");
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [errorMessage]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (isSubmitEnabled) {
-      dispatch(setLoading(true));
-      try {
-        const response = await fetch("http://127.0.0.1:3000/api/v1/content", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // Add this line to include the token
-          },
-          body: JSON.stringify({
-            title: title,
-            description: content,
-            url: link,
-            category: "education",
-          }),
-        });
-        const responseData = await response.json();
-        if (!response.ok) {
-          throw new Error(responseData.message || "Failed to create post");
-        }
-
-        dispatch(addPost(responseData.data.data));
-        console.log("Post created:", responseData.data.data);
-        alert("Post submitted successfully!");
-        // Clear the form
-        setTitle("");
-        setContent("");
-        setLink("");
-        navigate(`/user/${responseData.data.data.user}`);
-      } catch (error) {
-        console.error("Error creating post:", error);
-        dispatch(setError(error.message));
-        setErrorMessage("Unable to create a post");
-        // alert("Error submitting post. Please try again.");
-      } finally {
-        dispatch(setLoading(false));
-      }
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    }
-  };
-
+  // Button and UI helpers
   const handleButtonClick = useCallback((buttonValue) => {
     setActiveButton(buttonValue);
+    // Reset relevant state when switching
+    if (buttonValue !== "image" && buttonValue !== "video") {
+      setFile(null);
+      setUploadedMediaUrl(null);
+    }
   }, []);
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
 
   const getButtonStyle = (buttonValue) => {
     return activeButton === buttonValue
@@ -129,8 +204,19 @@ const EnhancedSubmitPage = () => {
       : "hover:bg-gray-300 bg-white text-gray-600";
   };
 
+  // Clear file handler
+  const clearFile = () => {
+    setFile(null);
+    setUploadedMediaUrl(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto p-6 my-20 bg-background">
+    <div className="max-w-4xl mx-auto ml-60 p-6 my-20 bg-background">
+      {/* Error message */}
       <AnimatePresence>
         {errorMessage && (
           <motion.div
@@ -143,13 +229,11 @@ const EnhancedSubmitPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
       <h1 className="text-3xl font-bold mb-6 text-center">Create post</h1>
 
-      <Form
-        onSubmit={handleSubmit}
-        method="post"
-        className="space-y-10 space-x-10"
-      >
+      <form onSubmit={handleSubmit} className="space-y-10">
+        {/* Title Input */}
         <Input
           type="text"
           id="title"
@@ -157,98 +241,100 @@ const EnhancedSubmitPage = () => {
           value={title}
           name="title"
           onChange={(e) => setTitle(e.target.value)}
-          className={`${baseClasses} ${variantClasses.outline}`}
+          className="w-full p-4 rounded-xl border"
           required
         />
 
+        {/* Content Type Buttons */}
         <div className="space-y-4">
-          <div className="grid w-full grid-cols-4 h-auto">
-            <Button
-              type="button"
-              onClick={() => handleButtonClick("post")}
-              className={getButtonStyle("post")}
-            >
-              <Type className="w-4 h-4 mr-2" /> Post
-            </Button>
-
-            <Button
-              type="button"
-              onClick={() => handleButtonClick("image")}
-              className={getButtonStyle("image")}
-            >
-              <ImageIcon className="w-4 h-4 mr-2" /> Image
-            </Button>
-
-            <Button
-              type="button"
-              onClick={() => handleButtonClick("video")}
-              className={getButtonStyle("video")}
-            >
-              <Video className="w-4 h-4 mr-2" /> Video
-            </Button>
-
-            <Button
-              type="button"
-              onClick={() => handleButtonClick("link")}
-              className={getButtonStyle("link")}
-            >
-              <Link2 className="w-4 h-4 mr-2" /> Link
-            </Button>
+          <div className="grid w-full grid-cols-4 h-auto gap-2">
+            {["post", "image", "video", "link"].map((type) => (
+              <Button
+                key={type}
+                type="button"
+                onClick={() => handleButtonClick(type)}
+                className={getButtonStyle(type)}
+              >
+                {type === "post" && <Type className="w-4 h-4 mr-2" />}
+                {type === "image" && <ImageIcon className="w-4 h-4 mr-2" />}
+                {type === "video" && <Video className="w-4 h-4 mr-2" />}
+                {type === "link" && <Link2 className="w-4 h-4 mr-2" />}
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Button>
+            ))}
           </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={isPreviewMode ? "preview" : "edit"}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              {isPreviewMode ? (
-                <PostPreview
-                  title={title}
-                  content={content}
-                  link={link}
-                  file={file}
-                />
+          {/* Content Area */}
+          {activeButton === "post" && (
+            <Textarea
+              placeholder="Text (optional)"
+              value={content}
+              name="description"
+              onChange={(e) => setContent(e.target.value)}
+              className="min-h-[190px] rounded-xl"
+            />
+          )}
+
+          {/* Media Upload Area */}
+          {(activeButton === "image" || activeButton === "video") && (
+            <div className="relative">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept={activeButton === "image" ? "image/*" : "video/*"}
+                className="hidden"
+              />
+
+              {!file && !uploadedMediaUrl ? (
+                <Button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full p-4 border-2 border-dashed"
+                >
+                  Upload {activeButton === "image" ? "Image" : "Video"}
+                </Button>
               ) : (
-                <div>
-                  {activeButton === "post" && (
-                    <Textarea
-                      placeholder="Text (optional)"
-                      value={content}
-                      name="description"
-                      onChange={(e) => setContent(e.target.value)}
-                      className="min-h-[190px] rounded-xl"
-                    />
+                <div className="relative">
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                      <div
+                        className="bg-blue-600 h-2.5 rounded-full"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
+
+                  {uploadedMediaUrl && (
+                    <div className="relative">
+                      {activeButton === "image" ? (
+                        <img
+                          src={uploadedMediaUrl}
+                          alt="Uploaded"
+                          className="w-full h-64 object-cover rounded-xl"
+                        />
+                      ) : (
+                        <video
+                          src={uploadedMediaUrl}
+                          controls
+                          className="w-full h-64 object-cover rounded-xl"
+                        />
+                      )}
+                      <Button
+                        type="button"
+                        onClick={clearFile}
+                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
-            </motion.div>
-          </AnimatePresence>
-
-          {activeButton === "image" && (
-            <FileUpload
-              type="image"
-              file={file}
-              name="image"
-              onFileChange={handleFileChange}
-              triggerFileInput={triggerFileInput}
-              fileInputRef={fileInputRef}
-            />
+            </div>
           )}
 
-          {activeButton === "video" && (
-            <FileUpload
-              type="video"
-              name="video"
-              file={file}
-              onFileChange={handleFileChange}
-              triggerFileInput={triggerFileInput}
-              fileInputRef={fileInputRef}
-            />
-          )}
-
+          {/* Link Input */}
           {activeButton === "link" && (
             <Input
               type="url"
@@ -261,12 +347,13 @@ const EnhancedSubmitPage = () => {
           )}
         </div>
 
+        {/* Action Buttons */}
         <div className="flex justify-between items-center">
           <Button
             type="button"
             variant="outline"
             onClick={() => setIsPreviewMode(!isPreviewMode)}
-            className="flex items-center  bg-gray-100 text-gray-400"
+            className="flex items-center bg-gray-100 text-gray-400"
           >
             {isPreviewMode ? (
               <Type className="w-4 h-4 mr-2" />
@@ -284,7 +371,7 @@ const EnhancedSubmitPage = () => {
             {!loading ? "Post" : "Posting..."}
           </Button>
         </div>
-      </Form>
+      </form>
     </div>
   );
 };

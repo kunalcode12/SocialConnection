@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const { cleanupTempUploads } = require('./utils/fileCleanup');
 
 // process.on('uncaughtException', (err) => {
 //   console.log('UNCAUGHT EXCEPTION!!  Shutting down...');
@@ -22,6 +23,9 @@ const app = require('./app');
 const port = process.env.PORT || 3000;
 const server = app.listen(port, () => {
   console.log(`App Running on port ${port}`);
+
+  cleanupTempUploads();
+  setInterval(cleanupTempUploads, 12 * 60 * 60 * 1000);
 });
 
 process.on('unhandledRejection', (err) => {

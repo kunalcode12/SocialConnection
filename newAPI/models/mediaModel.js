@@ -19,6 +19,11 @@ const mediaSchema = new mongoose.Schema({
   url: {
     type: String,
   },
+  chunks: [
+    {
+      type: Buffer,
+    },
+  ],
   cloudinaryId: {
     type: String,
   },
@@ -34,12 +39,18 @@ const mediaSchema = new mongoose.Schema({
   chunks: [chunkSchema],
   uploadedChunks: [
     {
-      type: Number,
+      chunkIndex: {
+        type: Number,
+        required: true,
+      },
+      chunkData: {
+        type: Buffer,
+        required: true,
+      },
     },
   ],
-  totalChunks: {
-    type: Number,
-  },
+  totalChunks: Number,
+
   metadata: {
     size: Number,
     format: String,
@@ -55,11 +66,14 @@ const mediaSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  content: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Content',
-    required: true,
-  },
+  originalname: String,
+  finalFileUrl: String,
+  cloudinaryPublicId: String,
+  // content: {
+  //   type: mongoose.Schema.Types.ObjectId,
+  //   ref: 'Content',
+  //   required: true,
+  // },
   createdAt: {
     type: Date,
     default: Date.now,

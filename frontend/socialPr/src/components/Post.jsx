@@ -9,6 +9,15 @@ import {
   Delete,
   BookmarkCheck,
   Bookmark,
+  Image,
+  ImageIcon,
+  VolumeX,
+  Volume2,
+  Pause,
+  Play,
+  Minimize2,
+  Maximize2,
+  X,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -27,12 +36,22 @@ import { savePostApi, unsavedPostApi } from "@/store/postSlice";
 import { Alert, AlertDescription } from "./UI/Alerts";
 import CommentModal from "./CommentModel";
 import { getComments, getUserVotes } from "@/store/commentSlice";
+import { Dialog, DialogContent } from "./UI/dialog";
 
 const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
   const [selectedPost, setSelectedPost] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showError, setShowError] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(true);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
+  const videoRef = useRef(null);
+  const videoModalRef = useRef(null);
+  const progressRef = useRef(null);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
   const navigate = useNavigate();
@@ -108,6 +127,59 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
         document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showDropdown]);
+
+  const handleVideoProgress = () => {
+    if (videoRef.current) {
+      const progressPercent =
+        (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      setVideoProgress(progressPercent);
+    }
+  };
+
+  const handleProgressBarClick = (e) => {
+    if (progressRef.current && videoRef.current) {
+      const progressBar = progressRef.current;
+      const clickPosition = e.nativeEvent.offsetX;
+      const progressBarWidth = progressBar.offsetWidth;
+      const clickPercentage = (clickPosition / progressBarWidth) * 100;
+      const newTime = (clickPercentage / 100) * videoRef.current.duration;
+
+      videoRef.current.currentTime = newTime;
+      setVideoProgress(clickPercentage);
+    }
+  };
+
+  const toggleVideoPlayback = () => {
+    if (videoRef.current) {
+      if (isVideoPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsVideoPlaying(!isVideoPlaying);
+    }
+  };
+
+  const toggleVideoMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isVideoMuted;
+      setIsVideoMuted(!isVideoMuted);
+    }
+  };
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      if (videoModalRef.current?.requestFullscreen) {
+        videoModalRef.current.requestFullscreen();
+        setIsFullScreen(true);
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullScreen(false);
+      }
+    }
+  };
 
   const formattedDate = formatDistanceToNow(new Date(post.createdAt), {
     addSuffix: true,
@@ -226,6 +298,57 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
           <CardDescription className="text-base text-gray-700 leading-relaxed">
             {post.description}
           </CardDescription>
+          {post.image && (
+            <div className="mt-4 w-full h-[400px] overflow-hidden rounded-lg relative group">
+              <img
+                src={post.image}
+                alt="Post attachment"
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                onClick={() => setImageModalOpen(true)}
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  className="bg-white/70 hover:bg-white/90 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => setImageModalOpen(true)}
+                >
+                  <ImageIcon className="h-6 w-6 text-gray-700" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Video Display */}
+          {post.video && (
+            <div className="mt-4 w-full h-[400px] relative group">
+              <video
+                ref={videoRef}
+                src={post.video}
+                className="w-full h-full object-cover rounded-lg"
+                muted
+                onTimeUpdate={handleVideoProgress}
+                onEnded={() => setIsVideoPlaying(false)}
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  className="bg-white/70 hover:bg-white/90 rounded-full p-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => setVideoModalOpen(true)}
+                >
+                  <Play className="h-8 w-8 text-gray-700" />
+                </Button>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-300">
+                <div
+                  ref={progressRef}
+                  className="h-full bg-blue-500 cursor-pointer"
+                  style={{ width: `${videoProgress}%` }}
+                  onClick={handleProgressBarClick}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center space-x-3 mt-4">
             <Button
               variant="ghost"
@@ -273,6 +396,99 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
           </div>
         </CardContent>
       </Card>
+      {imageModalOpen && post.image && (
+        <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
+          <DialogContent className="p-0 sm:max-w-[80vw] sm:max-h-[80vh] w-full h-full flex items-center justify-center">
+            <div className="max-w-full max-h-full flex items-center justify-center">
+              <img
+                src={post.image}
+                alt="Full size post image"
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              className="absolute top-2 right-2 bg-white/70 hover:bg-white/90 rounded-full p-2"
+              onClick={() => setImageModalOpen(false)}
+            >
+              <X className="h-6 w-6 text-gray-700" />
+            </Button>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Video Modal */}
+      {videoModalOpen && post.video && (
+        <Dialog open={videoModalOpen} onOpenChange={setVideoModalOpen}>
+          <DialogContent
+            ref={videoModalRef}
+            className="p-0 sm:max-w-[80vw] sm:max-h-[80vh] w-full h-full flex flex-col"
+          >
+            <div className="relative w-full flex-grow flex items-center justify-center">
+              <video
+                ref={videoRef}
+                src={post.video}
+                className="max-w-full max-h-full object-contain"
+                autoPlay
+                onTimeUpdate={handleVideoProgress}
+                onEnded={() => setIsVideoPlaying(false)}
+              />
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-300">
+                <div
+                  ref={progressRef}
+                  className="h-full bg-blue-500 cursor-pointer"
+                  style={{ width: `${videoProgress}%` }}
+                  onClick={handleProgressBarClick}
+                />
+              </div>
+              <div className="absolute top-2 right-2 flex space-x-2">
+                <Button
+                  variant="ghost"
+                  className="bg-white/70 hover:bg-white/90 rounded-full p-2"
+                  onClick={toggleFullScreen}
+                >
+                  {isFullScreen ? (
+                    <Minimize2 className="h-5 w-5" />
+                  ) : (
+                    <Maximize2 className="h-5 w-5" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="bg-white/70 hover:bg-white/90 rounded-full p-2"
+                  onClick={() => setVideoModalOpen(false)}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-4">
+              <Button
+                variant="ghost"
+                className="bg-white/70 hover:bg-white/90 rounded-full p-2"
+                onClick={toggleVideoPlayback}
+              >
+                {isVideoPlaying ? (
+                  <Pause className="h-6 w-6 text-gray-700" />
+                ) : (
+                  <Play className="h-6 w-6 text-gray-700" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className="bg-white/70 hover:bg-white/90 rounded-full p-2"
+                onClick={toggleVideoMute}
+              >
+                {isVideoMuted ? (
+                  <VolumeX className="h-6 w-6 text-gray-700" />
+                ) : (
+                  <Volume2 className="h-6 w-6 text-gray-700" />
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <CommentModal
         post={selectedPost}
