@@ -39,6 +39,7 @@ const EnhancedSubmitPage = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedMediaUrl, setUploadedMediaUrl] = useState(null);
+  const [mediaUploadInfo, setMediaUploadInfo] = useState(null);
 
   const fileInputRef = useRef(null);
   const loading = useSelector((state) => state.post.loading);
@@ -72,13 +73,20 @@ const EnhancedSubmitPage = () => {
           filename: selectedFile.name,
         },
       });
+      setMediaUploadInfo(initResult.data);
 
       const { uploadId, totalChunks } = initResult.data;
       const chunks = chunkFile(selectedFile);
 
       // Upload chunks
       for (let i = 0; i < chunks.length; i++) {
-        await mediaService.uploadChunk(chunks[i], i, uploadId, totalChunks);
+        await mediaService.uploadChunk(
+          chunks[i],
+          i,
+          uploadId,
+          totalChunks,
+          selectedFile.type.startsWith("image/") ? "image" : "video"
+        );
         setUploadProgress(((i + 1) / chunks.length) * 100);
       }
 
@@ -92,6 +100,7 @@ const EnhancedSubmitPage = () => {
         }
       );
       const statusData = await statusResponse.json();
+      console.log(statusData);
 
       setUploadedMediaUrl(statusData.data.url);
       return statusData.data.url;
@@ -128,8 +137,16 @@ const EnhancedSubmitPage = () => {
           description: content,
           url: link || uploadedMediaUrl,
           category: "education",
-          ...(activeButton === "image" && { image: uploadedMediaUrl }),
-          ...(activeButton === "video" && { video: uploadedMediaUrl }),
+          ...(activeButton === "image" && {
+            image: uploadedMediaUrl,
+            mediaId: mediaUploadInfo?.media?._id,
+            uploadId: mediaUploadInfo?.uploadId,
+          }),
+          ...(activeButton === "video" && {
+            video: uploadedMediaUrl,
+            mediaId: mediaUploadInfo?.media?._id,
+            uploadId: mediaUploadInfo?.uploadId,
+          }),
         };
 
         const response = await fetch("http://127.0.0.1:3000/api/v1/content", {
@@ -150,13 +167,14 @@ const EnhancedSubmitPage = () => {
         console.log("Post created:", responseData.data.data);
         alert("Post submitted successfully!");
 
-        // Reset form
+        // Reset form and media upload info
         setTitle("");
         setContent("");
         setLink("");
         setFile(null);
         setUploadedMediaUrl(null);
         setUploadProgress(0);
+        setMediaUploadInfo(null);
 
         navigate(`/user/${responseData.data.data.user}`);
       } catch (error) {

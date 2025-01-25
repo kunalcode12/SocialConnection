@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/UI/Avatar";
 import { Button } from "../components/UI/Button";
 import {
@@ -28,7 +28,7 @@ import { fetchUserData } from "../store/authSlice";
 import { useEffect } from "react";
 import LoadingBar from "../components/UI/LoadingBar";
 import UserPost from "../components/UserPost";
-import { setPosts } from "../store/postSlice";
+import { setPosts, upvoteContentApi } from "../store/postSlice";
 import { Outlet } from "react-router-dom";
 import { setBookMarkedPost } from "../store/postSlice";
 import SavedContent from "@/components/SavedContent";
@@ -110,6 +110,17 @@ export default function UserProfile() {
       setFollowInProgress(false);
     }
   };
+
+  const handleUpvote = useCallback(
+    (postId) => {
+      try {
+        dispatch(upvoteContentApi(postId));
+      } catch (error) {
+        console.error("Upvote failed:", error);
+      }
+    },
+    [dispatch]
+  );
 
   const handleClick = (userID) => {
     navigate(`/user/${userID}`);
@@ -378,6 +389,8 @@ export default function UserProfile() {
                     post={post}
                     id={renderData?._id}
                     name={renderData.name}
+                    onUpvote={handleUpvote}
+                    currentUser={user}
                   />
                 ))
               ) : (

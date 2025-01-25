@@ -7,8 +7,9 @@ const path = require('path');
 const fs = require('fs').promises;
 const cloudinary = require('../config/cloudinary');
 const Media = require('../models/mediaModel');
-const uploadDir = path.join(__dirname, 'uploads');
-
+const sharp = require('sharp');
+const ffmpeg = require('fluent-ffmpeg');
+const { Readable } = require('stream');
 // try {
 //   fs.mkdir(uploadDir, { recursive: true });
 // } catch (error) {
@@ -26,6 +27,94 @@ class UploadService {
 
   generateUploadId() {
     return crypto.randomBytes(16).toString('hex');
+  }
+  async preprocessChunk(chunk, mimetype) {
+    // Create a temporary file path for the incoming chunk
+    const chunkId = crypto.randomBytes(8).toString('hex');
+    const tempChunkPath = path.join(this.tmpDir, `chunk_${chunkId}.tmp`);
+
+    // Ensure temp directory exists
+    await fs.mkdir(this.tmpDir, { recursive: true });
+
+    // Write chunk to temporary file
+    await fs.writeFile(tempChunkPath, chunk);
+
+    try {
+      const fileType = mimetype;
+      let processedChunk;
+      console.log('File type:', fileType);
+
+      if (fileType === 'image') {
+        processedChunk = await this.preprocessImageChunk(tempChunkPath);
+      } else if (fileType === 'video') {
+        processedChunk = await this.preprocessVideoChunk(tempChunkPath);
+      } else {
+        // If not image or video, return the original chunk
+        processedChunk = await fs.readFile(tempChunkPath);
+      }
+
+      // Clean up the temporary chunk file
+      await this.cleanupTempFile(tempChunkPath);
+
+      return processedChunk;
+    } catch (error) {
+      // Cleanup temp file in case of error
+      await this.cleanupTempFile(tempChunkPath);
+      throw error;
+    }
+  }
+
+  async preprocessImageChunk(tempChunkPath) {
+    console.log('Temppath:', tempChunkPath);
+    try {
+      await fs.access(tempChunkPath);
+      return await sharp(tempChunkPath)
+        .resize({
+          width: 720,
+          height: 720,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .toFormat('webp', { quality: 80 })
+        .toBuffer();
+    } catch (error) {
+      console.error('Image chunk preprocessing error:', error);
+      throw new Error(`Image chunk preprocessing failed: ${error.message}`);
+    }
+  }
+
+  async preprocessVideoChunk(tempChunkPath) {
+    return new Promise((resolve, reject) => {
+      const outputPath = path.join(
+        this.tmpDir,
+        `processed_chunk_${crypto.randomBytes(8).toString('hex')}.mp4`
+      );
+
+      ffmpeg(tempChunkPath)
+        .videoCodec('libx264')
+        .size('1280x720')
+        .fps(30)
+        .videoBitrate('1500k')
+        .audioBitrate('128k')
+        .toFormat('mp4')
+        .on('end', async () => {
+          try {
+            const processedBuffer = await fs.readFile(outputPath);
+
+            // Clean up output file
+            await this.cleanupTempFile(outputPath);
+
+            resolve(processedBuffer);
+          } catch (error) {
+            reject(error);
+          }
+        })
+        .on('error', (err) => {
+          console.error('Video chunk processing error:', err);
+          reject(err);
+        })
+        .save(outputPath);
+    });
   }
 
   async createTempFile(uploadId) {
@@ -45,57 +134,9 @@ class UploadService {
     }
   }
 
-  // async handleChunk(chunk, uploadId, chunkIndex, totalChunks, media) {
-  //   try {
-  //     // Validate inputs
-  //     if (!chunk || !Buffer.isBuffer(chunk)) {
-  //       throw new Error('Invalid chunk data');
-  //     }
-
-  //     const tempPath = await this.createTempFile(uploadId);
-
-  //     // Append chunk to file
-  //     const writeStream = createWriteStream(tempPath, { flags: 'a' });
-  //     await new Promise((resolve, reject) => {
-  //       writeStream.write(chunk, (err) => {
-  //         if (err) reject(err);
-  //         else resolve();
-  //       });
-  //     });
-  //     writeStream.end();
-
-  //     // Save chunk metadata
-  //     media.chunks.push({
-  //       index: chunkIndex,
-  //       size: chunk.length,
-  //     });
-
-  //     if (!media.uploadedChunks.includes(chunkIndex)) {
-  //       media.uploadedChunks.push(chunkIndex);
-  //     }
-
-  //     await media.save();
-
-  //     // If all chunks received, process the complete file
-  //     if (media.uploadedChunks.length === totalChunks) {
-  //       return this.processCompleteFile(media, tempPath);
-  //     }
-
-  //     return {
-  //       uploadId,
-  //       chunksReceived: media.uploadedChunks.length,
-  //       totalChunks,
-  //       status: 'uploading',
-  //     };
-  //   } catch (error) {
-  //     console.error('Chunk handling error:', error);
-  //     media.status = 'failed';
-  //     await media.save();
-  //     throw error;
-  //   }
-  // }
-  async handleChunk(chunk, uploadId, chunkIndex, totalChunks) {
+  async handleChunk(chunk, uploadId, chunkIndex, totalChunks, mimetype) {
     let filePath = null;
+    let processedFilePath = null;
     try {
       // Ensure chunk is a Buffer
       if (!Buffer.isBuffer(chunk)) {
@@ -139,19 +180,41 @@ class UploadService {
 
       // Check if upload is complete
       if (media.uploadedChunks.length === parsedTotalChunks) {
-        // Create a temporary file path
-        filePath = path.join(this.tmpDir, `${uploadId}-complete.tmp`);
-
-        // Combine and write chunks to temp file
+        // Combine chunks
         const fullFile = Buffer.concat(
           media.uploadedChunks.map((chunk) => chunk.chunkData)
         );
+
+        // Create a temporary file path for original media
+        filePath = path.join(this.tmpDir, `${uploadId}-original.tmp`);
+
+        // Write original file
         await fs.writeFile(filePath, fullFile);
 
+        // Process the file
+        let processedFile;
         try {
-          // Upload to Cloudinary
+          if (mimetype === 'image') {
+            processedFile = await this.preprocessImageChunk(filePath);
+          } else if (mimetype === 'video') {
+            processedFile = await this.preprocessVideoChunk(filePath);
+          } else {
+            // If not image or video, use original file
+            processedFile = fullFile;
+          }
+
+          // Create a path for the processed file
+          processedFilePath = path.join(
+            this.tmpDir,
+            `${uploadId}-processed.tmp`
+          );
+
+          // Write processed file
+          await fs.writeFile(processedFilePath, processedFile);
+
+          // Upload to Cloudinary with processed file
           const cloudinaryResponse = await this.uploadToCloudinary(
-            filePath,
+            processedFilePath,
             media
           );
 
@@ -159,13 +222,32 @@ class UploadService {
           media.status = 'completed';
           media.url = cloudinaryResponse.secure_url;
           media.cloudinaryPublicId = cloudinaryResponse.public_id;
-        } catch (cloudinaryError) {
-          // Cloudinary upload failed
+        } catch (processingError) {
+          // Processing or Cloudinary upload failed
           media.status = 'failed';
-          console.error('Cloudinary upload error:', cloudinaryError);
+          console.error('Media processing/upload error:', {
+            message: processingError.message,
+            stack: processingError.stack,
+            originalFileName: filePath,
+            processedFileName: processedFilePath,
+          });
+
+          // Throw to trigger error handling
+          throw processingError;
         } finally {
-          // Always attempt to remove the temporary file
-          await this.cleanupTempFile(filePath);
+          // Cleanup temporary files
+          const tempFiles = [filePath, processedFilePath].filter(Boolean);
+          for (const tempFile of tempFiles) {
+            try {
+              await this.cleanupTempFile(tempFile);
+            } catch (cleanupError) {
+              console.error('Failed to delete temporary file:', {
+                path: tempFile,
+                error: cleanupError.message,
+                stack: cleanupError.stack,
+              });
+            }
+          }
         }
       } else {
         media.status = 'uploading';
@@ -182,40 +264,92 @@ class UploadService {
         url: media.url || null,
       };
     } catch (error) {
-      // Attempt to cleanup temp file in case of error
-      if (filePath) {
-        await this.cleanupTempFile(filePath);
-      }
+      // Comprehensive error logging
+      console.error('Handle chunk overall error:', {
+        message: error.message,
+        stack: error.stack,
+        uploadId,
+        originalFilePath: filePath,
+        processedFilePath,
+      });
 
       // Update media status to failed
-      await Media.findOneAndUpdate(
-        { uploadId },
-        { status: 'failed' },
-        { new: true }
-      );
+      try {
+        await Media.findOneAndUpdate(
+          { uploadId },
+          { status: 'failed' },
+          { new: true }
+        );
+      } catch (updateError) {
+        console.error('Failed to update media status:', {
+          uploadId,
+          error: updateError.message,
+          stack: updateError.stack,
+        });
+      }
 
-      console.error('Handle chunk error:', error);
+      // Cleanup temporary files if they exist
+      const tempFiles = [filePath, processedFilePath].filter(Boolean);
+      for (const tempFile of tempFiles) {
+        try {
+          await this.cleanupTempFile(tempFile);
+        } catch (cleanupError) {
+          console.error(
+            'Failed to delete temporary file during error handling:',
+            {
+              path: tempFile,
+              error: cleanupError.message,
+              stack: cleanupError.stack,
+            }
+          );
+        }
+      }
+
       throw new Error(`Failed to handle chunk: ${error.message}`);
     }
   }
 
-  async cleanupTempFile(filePath) {
-    if (!filePath) return;
+  async deleteFromCloud(cloudinaryPublicId, resourceType) {
+    if (!cloudinaryPublicId) return;
 
     try {
-      // Check if file exists before attempting to delete
-      await fs.access(filePath);
-      await fs.unlink(filePath);
-      console.log(`Temporary file deleted: ${filePath}`);
+      const result = await cloudinary.uploader.destroy(cloudinaryPublicId, {
+        resource_type: resourceType, // Automatically detect resource type
+      });
+
+      console.log('Cloudinary deletion result:', result);
+      return result;
     } catch (error) {
-      // If file doesn't exist or can't be deleted, log the error
-      console.warn(
-        `Failed to delete temporary file ${filePath}:`,
-        error.message
-      );
+      console.error('Error deleting from Cloudinary:', error);
+      throw new Error(`Cloudinary deletion failed: ${error.message}`);
     }
   }
 
+  async cleanupTempFile(filePath) {
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    if (!filePath) return;
+
+    try {
+      // Wait briefly to allow other processes to release the file
+      await delay(10000);
+
+      // Check if file exists before attempting to delete
+      await fs.access(filePath, fs.constants.F_OK);
+
+      // Attempt to delete the file
+      await fs.unlink(filePath);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        console.error('Error deleting file:', {
+          path: filePath,
+          errorCode: error.code,
+          errorMessage: error.message,
+          stack: error.stack,
+        });
+        throw error;
+      }
+    }
+  }
   async processCompleteFile(media, tempPath) {
     try {
       media.status = 'processing';
@@ -255,7 +389,45 @@ class UploadService {
     }
   }
 
+  async uploadToCloudinary1(fileBuffer, mediaType) {
+    return new Promise((resolve, reject) => {
+      // Create a stream from the buffer
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: mediaType === 'video' ? 'video' : 'image',
+          eager_async: true,
+          eager: this.getTransformations(mediaType),
+        },
+        (error, result) => {
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(error);
+          } else {
+            console.log('Cloudinary upload result:', {
+              url: result.secure_url,
+              width: result.width,
+              height: result.height,
+            });
+            resolve(result);
+          }
+        }
+      );
+
+      // Convert buffer to stream and pipe it
+      const bufferStream = new Readable();
+      bufferStream.push(fileBuffer);
+      bufferStream.push(null);
+      bufferStream.pipe(uploadStream);
+    });
+  }
+
   async uploadToCloudinary(filePath, media) {
+    console.log('Uploading to Cloudinary:', {
+      filePath,
+      mediaType: media.type,
+      fileSize: (await fs.stat(filePath)).size,
+    });
+
     const uploadOptions = {
       resource_type: media.type === 'video' ? 'video' : 'image',
       chunk_size: this.CHUNK_SIZE,
@@ -265,8 +437,17 @@ class UploadService {
 
     return new Promise((resolve, reject) => {
       cloudinary.uploader.upload(filePath, uploadOptions, (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          reject(error);
+        } else {
+          console.log('Cloudinary upload result:', {
+            url: result.secure_url,
+            width: result.width,
+            height: result.height,
+          });
+          resolve(result);
+        }
       });
     });
   }

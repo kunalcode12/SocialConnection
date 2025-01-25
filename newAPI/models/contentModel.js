@@ -34,10 +34,17 @@ const contentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    commentCount: {
+      type: Number,
+      default: 0,
+    },
     flagged: {
       type: Boolean,
       default: false,
     },
+    mediaId: String,
+    uploadId: String,
+
     createdAt: {
       type: Date,
       default: Date.now(),

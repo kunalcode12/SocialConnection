@@ -1,4 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { act } from "react";
 
 const initialPostState = {
   posts: [],
@@ -83,6 +84,18 @@ export const postSlice = createSlice({
         }
       }
     },
+    incrementCommentCount: (state, action) => {
+      const post = state.posts.find((post) => post._id === action.payload);
+      if (post) {
+        post.commentCount = (post.commentCount || 0) + 1;
+      }
+    },
+    decrementCommentCount: (state, action) => {
+      const post = state.posts.find((post) => post._id === action.payload);
+      if (post) {
+        post.commentCount = Math.max((post.commentCount || 0) - 1, 0);
+      }
+    },
     setLoading: (state, action) => {
       state.loading = action.payload;
     },
@@ -115,6 +128,20 @@ export const postSlice = createSlice({
     setPosts: (state, action) => {
       state.posts = action.payload;
     },
+    resetStates: (state) => {
+      state.upvotingLoading = false;
+      state.upvotingError = false;
+      state.upvotingSuccess = false;
+      state.loading = false;
+      state.updatePostLoading = false;
+      state.updatePostError = false;
+      state.updatePostSuccess = false;
+      state.savingSuccess = false;
+      state.savingError = false;
+      state.error = null;
+      state.isError = false;
+      state.success = false;
+    },
   },
 });
 
@@ -140,6 +167,9 @@ export const {
   setUpvotingError,
   setUpvotingSuccess,
   updatePostUpvote,
+  incrementCommentCount,
+  decrementCommentCount,
+  resetStates,
 } = postSlice.actions;
 export default postSlice.reducer;
 

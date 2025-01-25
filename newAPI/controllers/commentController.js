@@ -1,6 +1,7 @@
 const Comment = require('../models/commentModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const Content = require('../models/contentModel');
 
 exports.createComment = catchAsync(async (req, res, next) => {
   const id = req.params.contentId;
@@ -8,19 +9,27 @@ exports.createComment = catchAsync(async (req, res, next) => {
     req.body.userId = req.user.id;
   }
   if (!id) {
-    next(new AppError('No content found with given id', 404));
+    return next(new AppError('No content found with given id', 404));
   }
+
   const { userId, comment } = req.body;
+
+  // Create comment
   let createComment = await Comment.create({
     contentId: id,
     userId,
     comment,
-    //parentCommentId: parentCommentId || null,
   });
 
+  // Populate user details
   createComment = await createComment.populate({
     path: 'userId',
     select: 'name email',
+  });
+
+  // Update comment count in Content
+  await Content.findByIdAndUpdate(id, {
+    $inc: { commentCount: 1 },
   });
 
   res.status(201).json({
@@ -99,20 +108,45 @@ exports.deleteComment = catchAsync(async (req, res, next) => {
   if (!req.body.userId) {
     req.body.userId = req.user.id;
   }
+
   if (!id) {
-    next(new AppError('Please provide the id of comment', 404));
+    return next(new AppError('Please provide the id of comment', 404));
   }
+
   const comment = await Comment.findById(id);
 
-  if (!comment) next(new AppError('please provide valid comment id', 404));
+  if (!comment) {
+    return next(new AppError('Please provide valid comment id', 404));
+  }
+
   if (comment.userId.toString() === req.body.userId) {
-    const deleteCom = await Comment.findByIdAndDelete(id);
-    res.status(200).json({
-      status: 'success',
-      data: {
-        message: 'Comment deleted successfully',
-      },
-    });
+    // If the comment has replies, mark it as deleted
+    if (comment.replies.length > 0) {
+      comment.isDeleted = true;
+      await comment.save();
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          message: 'Comment marked as deleted due to existing replies',
+        },
+      });
+    } else {
+      // Delete the comment if no replies
+      await Comment.findByIdAndDelete(id);
+
+      // Decrement comment count in Content
+      await Content.findByIdAndUpdate(comment.contentId, {
+        $inc: { commentCount: -1 },
+      });
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          message: 'Comment deleted successfully',
+        },
+      });
+    }
   } else {
     res.status(405).json({
       status: 'fail',
@@ -123,56 +157,8 @@ exports.deleteComment = catchAsync(async (req, res, next) => {
   }
 });
 
-// exports.deleteReplyComment = catchAsync(async (req, res, next) => {
-//   req.body.userId = req.body.userId || req.user.id;
-
-//   const comment_id = req.params.commentId;
-//   const reply_id = req.params.replyId;
-
-//   if (!comment_id && !reply_id)
-//     next(new AppError('please provide comment and reply id', 403));
-
-//   const sameUser = await Comment.findById(comment_id);
-
-//   if (!sameUser || !sameUser.replies) {
-//     next(new AppError('No replies found or comment does not exist', 404));
-//   }
-
-//   const userReply = sameUser.replies.find(
-//     (el) =>
-//       el._id.toString() === reply_id && el.userId.toString() === req.body.userId
-//   );
-//   console.log(userReply);
-
-//   if (!userReply) {
-//     next(
-//       new AppError(
-//         'Reply not found or you do not have permission to delete it',
-//         403
-//       )
-//     );
-//   }
-
-//   const comment = await Comment.findOneAndUpdate(
-//     { _id: comment_id },
-//     { $pull: { replies: { _id: reply_id } } },
-//     { new: true }
-//   );
-
-//   if (!comment) {
-//     next(new AppError('Comment or reply not found', 404));
-//   }
-//   res.status(200).json({
-//     status: 'success',
-//     data: {
-//       message: 'reply in a comment deleted successfully',
-//     },
-//   });
-// });
-
 exports.deleteReplyComment = catchAsync(async (req, res, next) => {
   req.body.userId = req.body.userId || req.user.id;
-
   const comment_id = req.params.commentId;
   const reply_id = req.params.replyId;
 
@@ -180,21 +166,20 @@ exports.deleteReplyComment = catchAsync(async (req, res, next) => {
     return next(new AppError('Please provide comment and reply IDs', 403));
   }
 
-  const sameUser = await Comment.findById(comment_id);
+  const comment = await Comment.findById(comment_id);
 
-  if (!sameUser || !sameUser.replies) {
+  if (!comment || !comment.replies) {
     return next(
       new AppError('No replies found or comment does not exist', 404)
     );
   }
 
-  const userReply = sameUser.replies.find(
+  const replyIndex = comment.replies.findIndex(
     (el) =>
       el._id.toString() === reply_id && el.userId.toString() === req.body.userId
   );
-  console.log(userReply);
 
-  if (!userReply) {
+  if (replyIndex === -1) {
     return next(
       new AppError(
         'Reply not found or you do not have permission to delete it',
@@ -203,20 +188,24 @@ exports.deleteReplyComment = catchAsync(async (req, res, next) => {
     );
   }
 
-  const comment = await Comment.findOneAndUpdate(
-    { _id: comment_id },
-    { $pull: { replies: { _id: reply_id } } },
-    { new: true }
-  );
+  comment.replies.splice(replyIndex, 1);
+  await comment.save();
 
-  if (!comment) {
-    return next(new AppError('Comment or reply not found', 404));
+  let responseMessage = 'Reply in a comment deleted successfully';
+  if (comment.replies.length === 0 && comment.isDeleted) {
+    await Comment.findByIdAndDelete(comment_id);
+
+    await Content.findByIdAndUpdate(comment.contentId, {
+      $inc: { commentCount: -1 },
+    });
+
+    responseMessage = 'Last reply deleted and comment removed';
   }
 
   res.status(200).json({
     status: 'success',
     data: {
-      message: 'Reply in a comment deleted successfully',
+      message: responseMessage,
     },
   });
 });

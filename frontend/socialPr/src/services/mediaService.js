@@ -4,6 +4,7 @@ const API_URL = "http://127.0.0.1:3000/api/v1";
 const handleResponse = async (response) => {
   if (!response.ok) {
     const error = await response.json();
+    console.log(error);
     throw new Error(error.message || "Something went wrong");
   }
   return response.json();
@@ -88,11 +89,15 @@ export const mediaService = {
       },
       body: JSON.stringify(mediaData),
     });
-    return handleResponse(response);
+
+    const d = await response.json();
+    console.log(d);
+    // return handleResponse(response);
+    return d;
   },
 
   // Upload chunk
-  uploadChunk: async (chunk, chunkIndex, uploadId, totalChunks) => {
+  uploadChunk: async (chunk, chunkIndex, uploadId, totalChunks, typeFile) => {
     const formData = new FormData();
 
     // Ensure chunk is added correctly
@@ -100,11 +105,7 @@ export const mediaService = {
     formData.append("uploadId", uploadId);
     formData.append("totalChunks", totalChunks);
     formData.append("chunkIndex", chunkIndex);
-
-    console.log("Frontend Chunk:", chunk);
-    console.log("Frontend ChunkIndex:", chunkIndex);
-    console.log("Frontend UploadId:", uploadId);
-    console.log("Frontend TotalChunks:", totalChunks);
+    formData.append("typeFile", typeFile);
 
     const response = await fetch(`${API_URL}/media/chunk`, {
       method: "POST",
@@ -129,26 +130,56 @@ export const mediaService = {
   },
 
   // Update media
-  updateMedia: async (mediaId, updateData) => {
-    const response = await fetch(`${API_URL}/media/${mediaId}`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updateData),
-    });
-    return handleResponse(response);
+  updateMedia: async (mediaId, file, typeFile, contentId) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file); // 'file' should match the middleware expectation
+      formData.append("typeFile", typeFile);
+      formData.append("contentId", contentId);
+
+      const url = new URL(`${API_URL}/media/${mediaId}`);
+
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // Add the authorization header
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Media update failed");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Media update error:", error);
+      throw error;
+    }
   },
 
   // Delete media
   deleteMedia: async (mediaId) => {
-    const response = await fetch(`${API_URL}/media/${mediaId}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-    return handleResponse(response);
+    try {
+      const response = await fetch(`${API_URL}/media/${mediaId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      // For 204 No Content, return null or a success indicator
+      if (response.status === 204) {
+        return { success: true };
+      }
+
+      // For other status codes, parse JSON
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Delete media error:", error);
+      throw error;
+    }
   },
 };

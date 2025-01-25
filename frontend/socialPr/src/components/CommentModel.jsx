@@ -58,10 +58,14 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
   }, [isOpen, dispatch]);
 
   const handleShowReplyInput = (commentId) => {
-    setReplyStates((prev) => ({
-      ...prev,
-      [commentId]: !prev[commentId],
-    }));
+    // Prevent reply input for deleted comments
+    const comment = comments.find((c) => c.id === commentId);
+    if (comment && !comment.isDeleted) {
+      setReplyStates((prev) => ({
+        ...prev,
+        [commentId]: !prev[commentId],
+      }));
+    }
   };
 
   useEffect(() => {
@@ -75,6 +79,10 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
 
   const handleAddReply = (e, commentId) => {
     e.preventDefault();
+
+    // Prevent replying to deleted comments
+    const comment = comments.find((c) => c.id === commentId);
+    if (comment && comment.isDeleted) return;
 
     const replyText = replyTexts[commentId];
 
@@ -111,15 +119,18 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
 
   const handleDeleteComment = (commentId) => {
     // Dispatch delete comment action
-    dispatch(deleteComment(commentId));
+    dispatch(deleteComment(commentId, post._id));
   };
 
   const handleDeleteReply = (commentId, replyId) => {
-    dispatch(deleteReply(commentId, replyId));
+    dispatch(deleteReply(commentId, replyId, post._id));
   };
 
   const handleUpvoteComment = (commentId) => {
-    dispatch(upvoteComment(commentId));
+    const comment = comments.find((c) => c._id === commentId);
+    if (comment && !comment.isDeleted) {
+      dispatch(upvoteComment(commentId));
+    }
   };
 
   const handleUpvoteReply = (commentId, replyId) => {
@@ -283,56 +294,63 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
                                   {comment.comment}
                                 </span>
                               </p>
-                              {isCommentOwner(comment) && (
+                              {!comment.isDeleted &&
+                                isCommentOwner(comment) && (
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteComment(comment._id)
+                                    }
+                                    className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-all duration-200 p-2 hover:bg-red-50 rounded-full"
+                                    title="Delete comment"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </button>
+                                )}
+                            </div>
+                            {!comment.isDeleted && (
+                              <div className="flex items-center space-x-4 text-xs mt-2 text-gray-500 pl-4">
+                                <span>
+                                  {formatDistanceToNow(
+                                    new Date(comment.createdAt),
+                                    { addSuffix: true }
+                                  )}
+                                </span>
                                 <button
                                   onClick={() =>
-                                    handleDeleteComment(comment._id)
+                                    handleUpvoteComment(comment._id)
                                   }
-                                  className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-all duration-200 p-2 hover:bg-red-50 rounded-full"
-                                  title="Delete comment"
+                                  className="flex items-center space-x-1 group transition-all duration-200 hover:scale-105"
                                 >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                  <Heart
+                                    className={`h-4 w-4 ${
+                                      hasUserUpvotedComment(comment._id)
+                                        ? "fill-red-500 text-red-500"
+                                        : "text-gray-400 group-hover:text-red-500"
+                                    } transition-colors`}
+                                  />
+                                  <span
+                                    className={`${
+                                      hasUserUpvotedComment(comment._id)
+                                        ? "text-red-500"
+                                        : "text-gray-500"
+                                    } group-hover:text-red-500`}
+                                  >
+                                    {comment.upVote || 0}
+                                  </span>
                                 </button>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-4 text-xs mt-2 text-gray-500 pl-4">
-                              <span>
-                                {formatDistanceToNow(
-                                  new Date(comment.createdAt),
-                                  { addSuffix: true }
-                                )}
-                              </span>
-                              <button
-                                onClick={() => handleUpvoteComment(comment._id)}
-                                className="flex items-center space-x-1 group transition-all duration-200 hover:scale-105"
-                              >
-                                <Heart
-                                  className={`h-4 w-4 ${
-                                    hasUserUpvotedComment(comment._id)
-                                      ? "fill-red-500 text-red-500"
-                                      : "text-gray-400 group-hover:text-red-500"
-                                  } transition-colors`}
-                                />
-                                <span
-                                  className={`${
-                                    hasUserUpvotedComment(comment._id)
-                                      ? "text-red-500"
-                                      : "text-gray-500"
-                                  } group-hover:text-red-500`}
+                                <button
+                                  className="font-semibold hover:text-blue-600 transition-colors duration-200"
+                                  onClick={() =>
+                                    handleShowReplyInput(comment.id)
+                                  }
                                 >
-                                  {comment.upVote || 0}
-                                </span>
-                              </button>
-                              <button
-                                className="font-semibold hover:text-blue-600 transition-colors duration-200"
-                                onClick={() => handleShowReplyInput(comment.id)}
-                              >
-                                Reply
-                              </button>
-                            </div>
+                                  Reply
+                                </button>
+                              </div>
+                            )}
 
                             {/* Reply Input */}
-                            {replyStates[comment.id] && (
+                            {replyStates[comment.id] && !comment.isDeleted && (
                               <form
                                 onSubmit={(e) => handleAddReply(e, comment.id)}
                                 className="mt-3 pl-4"

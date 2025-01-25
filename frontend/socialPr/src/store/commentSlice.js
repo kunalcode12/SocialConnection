@@ -1,4 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { incrementCommentCount, decrementCommentCount } from "./postSlice";
 
 const initialCommentState = {
   comments: [],
@@ -19,23 +20,34 @@ export const commentSlice = createSlice({
   initialState: initialCommentState,
   reducers: {
     setComments: (state, action) => {
-      state.comments = action.payload.map((comment) => ({
-        ...comment,
-        userId: {
-          _id: comment.userId._id,
-          name: comment.userId.name,
-          email: comment.userId.email,
-        },
-        replies: comment.replies.map((reply) => ({
-          ...reply,
-          userId: {
-            _id: reply.userId._id,
-            name: reply.userId.name,
-            email: reply.userId.email,
-            id: reply.userId.id,
-          },
-        })),
-      }));
+      state.comments = action.payload
+        .map((comment) => ({
+          ...comment,
+          // If comment is deleted and has no replies, remove it
+          ...(comment.isDeleted && comment.replies.length === 0
+            ? null
+            : {
+                userId: {
+                  _id: comment.userId._id,
+                  name: comment.userId.name,
+                  email: comment.userId.email,
+                },
+                // Replace comment text with "Comment deleted" if isDeleted is true
+                comment: comment.isDeleted
+                  ? "Comment deleted"
+                  : comment.comment,
+                replies: comment.replies.map((reply) => ({
+                  ...reply,
+                  userId: {
+                    _id: reply.userId._id,
+                    name: reply.userId.name,
+                    email: reply.userId.email,
+                    id: reply.userId.id,
+                  },
+                })),
+              }),
+        }))
+        .filter(Boolean); // Remove null entries
     },
 
     setUserVotes: (state, action) => {
@@ -65,15 +77,27 @@ export const commentSlice = createSlice({
     },
 
     removeComment: (state, action) => {
-      state.comments = state.comments.filter(
-        (comment) => comment._id !== action.payload
-      );
+      const comment = state.comments.find((c) => c._id === action.payload);
 
-      // Remove associated votes when comment is deleted
-      state.userVotes.commentVotes = state.userVotes.commentVotes.filter(
-        (vote) => vote.commentId !== action.payload
-      );
+      if (comment) {
+        // If comment has replies, mark as deleted
+        if (comment.replies && comment.replies.length > 0) {
+          comment.isDeleted = true;
+          comment.comment = "Comment deleted";
+        } else {
+          // If no replies, remove the comment completely
+          state.comments = state.comments.filter(
+            (comment) => comment._id !== action.payload
+          );
+        }
+
+        // Remove associated votes when comment is deleted
+        state.userVotes.commentVotes = state.userVotes.commentVotes.filter(
+          (vote) => vote.commentId !== action.payload
+        );
+      }
     },
+
     addReply: (state, action) => {
       const { commentId, reply } = action.payload;
       const comment = state.comments.find((c) => c._id === commentId);
@@ -107,7 +131,8 @@ export const commentSlice = createSlice({
     removeReply: (state, action) => {
       const { commentId, replyId } = action.payload;
       const comment = state.comments.find((c) => c._id === commentId);
-      if (comment && comment.replies) {
+      if (comment && comment.replies && comment.replies.length > 0) {
+        // Remove the specific reply
         comment.replies = comment.replies.filter(
           (reply) => reply._id !== replyId
         );
@@ -116,6 +141,11 @@ export const commentSlice = createSlice({
         state.userVotes.replyVotes = state.userVotes.replyVotes.filter(
           (vote) => vote.replyId !== replyId
         );
+
+        // If the comment is deleted and has no more replies, remove it completely
+        if (comment.isDeleted && comment.replies.length === 0) {
+          state.comments = state.comments.filter((c) => c._id !== commentId);
+        }
       }
     },
 
@@ -291,6 +321,7 @@ export const createComment = (postId, content) => async (dispatch) => {
     }
 
     dispatch(addComment(data.data.data));
+    dispatch(incrementCommentCount(postId));
     dispatch(setSuccess("Comment created successfully"));
     dispatch(setLoading(false));
     return data;
@@ -302,7 +333,7 @@ export const createComment = (postId, content) => async (dispatch) => {
 };
 
 // Delete a comment
-export const deleteComment = (commentId) => async (dispatch) => {
+export const deleteComment = (commentId, postId) => async (dispatch) => {
   try {
     dispatch(setLoading(true));
     const response = await fetch(
@@ -320,9 +351,21 @@ export const deleteComment = (commentId) => async (dispatch) => {
     if (!response.ok) {
       throw new Error(data.message || "Failed to delete comment");
     }
-    console.log(data);
 
-    dispatch(removeComment(commentId));
+    console.log(data.data);
+
+    // If comment is marked as deleted due to existing replies
+    if (
+      data.data.message === "Comment marked as deleted due to existing replies"
+    ) {
+      // Update the comment in the state to show as deleted
+      dispatch(removeComment(commentId));
+    } else {
+      // If comment is completely removed
+      dispatch(removeComment(commentId));
+      dispatch(decrementCommentCount(postId));
+    }
+
     dispatch(setSuccess("Comment deleted successfully"));
     dispatch(setLoading(false));
     return data;
@@ -375,7 +418,7 @@ export const replyToComment = (commentId, content) => async (dispatch) => {
   }
 };
 
-export const deleteReply = (commentId, replyId) => async (dispatch) => {
+export const deleteReply = (commentId, replyId, postId) => async (dispatch) => {
   try {
     dispatch(setLoading(true));
     const response = await fetch(
@@ -394,8 +437,15 @@ export const deleteReply = (commentId, replyId) => async (dispatch) => {
       throw new Error(data.message || "Failed to delete reply");
     }
 
-    dispatch(removeReply({ commentId, replyId }));
-    dispatch(setSuccess("Reply deleted successfully"));
+    if (data.data.message === "Last reply deleted and comment removed") {
+      dispatch(removeReply({ commentId, replyId }));
+      dispatch(decrementCommentCount(postId));
+      dispatch(setSuccess("Reply deleted successfully"));
+    } else {
+      dispatch(removeReply({ commentId, replyId }));
+      dispatch(setSuccess("Reply deleted successfully"));
+    }
+
     return data;
   } catch (error) {
     dispatch(setError(error.message));

@@ -190,6 +190,7 @@ export const fetchUserData = (userId, token) => async (dispatch) => {
       throw new Error("Account is inactive");
     }
     //console.log(`fetchUserdata one :`, userData.data.data.active);
+
     dispatch(setProfileUser(userData.data.data));
     dispatch(setLoading(false));
   } catch (error) {

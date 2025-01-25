@@ -48,11 +48,13 @@ exports.getUser = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.params.id)
     .populate({
       path: 'contents',
-      select: 'title upVote downVote description createdAt -user url',
+      select:
+        'title upVote downVote description createdAt -user url image video commentCount mediaId uploadId',
     })
     .populate({
       path: 'bookmarkedCont.content',
-      select: 'title upVote downVote description user createdAt url',
+      select:
+        'title upVote downVote description user createdAt url image video commentCount mediaId uploadId',
     });
 
   if (!user) {

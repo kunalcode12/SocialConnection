@@ -381,7 +381,7 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
               onClick={() => openComments(post)}
             >
               <MessageSquare className="h-5 w-5 text-gray-500" />
-              <span className="font-medium">{post.comments}</span>
+              <span className="font-medium">{post.commentCount}</span>
             </Button>
             <Button variant="ghost" className="hover:bg-gray-100 rounded-full">
               <Award className="h-5 w-5 text-gray-500" />

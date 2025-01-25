@@ -69,11 +69,10 @@ const mediaSchema = new mongoose.Schema({
   originalname: String,
   finalFileUrl: String,
   cloudinaryPublicId: String,
-  // content: {
-  //   type: mongoose.Schema.Types.ObjectId,
-  //   ref: 'Content',
-  //   required: true,
-  // },
+  content: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Content',
+  },
   createdAt: {
     type: Date,
     default: Date.now,
