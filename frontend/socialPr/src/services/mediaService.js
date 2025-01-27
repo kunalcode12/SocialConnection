@@ -130,19 +130,34 @@ export const mediaService = {
   },
 
   // Update media
-  updateMedia: async (mediaId, file, typeFile, contentId) => {
+  updateMedia: async (
+    mediaId,
+    file,
+    typeFile,
+    contentId,
+    isProfile = false
+  ) => {
     try {
       const formData = new FormData();
-      formData.append("file", file); // 'file' should match the middleware expectation
+      formData.append("file", file);
       formData.append("typeFile", typeFile);
-      formData.append("contentId", contentId);
 
-      const url = new URL(`${API_URL}/media/${mediaId}`);
+      // Only append contentId if it's not a profile picture update
+      if (!isProfile && contentId) {
+        formData.append("contentId", contentId);
+      }
 
-      const response = await fetch(url, {
-        method: "PUT",
+      // Choose the appropriate endpoint
+      const endpoint = isProfile
+        ? `${API_URL}/users/profilePicture`
+        : `${API_URL}/media/${mediaId}`;
+
+      const method = isProfile ? "PATCH" : "PUT";
+
+      const response = await fetch(endpoint, {
+        method: method,
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`, // Add the authorization header
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: formData,
       });
@@ -159,23 +174,52 @@ export const mediaService = {
     }
   },
 
-  // Delete media
-  deleteMedia: async (mediaId) => {
+  // Create profile picture
+  createProfilePicture: async (file) => {
     try {
-      const response = await fetch(`${API_URL}/media/${mediaId}`, {
+      const formData = new FormData();
+      formData.append("profilePicture", file);
+
+      const response = await fetch(`${API_URL}/users/profilePicture`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Profile picture creation failed");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Profile picture creation error:", error);
+      throw error;
+    }
+  },
+
+  // Delete media (works for both regular media and profile pictures)
+  deleteMedia: async (mediaId, isProfile = false) => {
+    try {
+      const endpoint = isProfile
+        ? `${API_URL}/users/profilePicture`
+        : `${API_URL}/media/${mediaId}`;
+
+      const response = await fetch(endpoint, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
-      // For 204 No Content, return null or a success indicator
       if (response.status === 204) {
         return { success: true };
       }
 
-      // For other status codes, parse JSON
       const data = await response.json();
+      console.log(data);
       return data;
     } catch (error) {
       console.error("Delete media error:", error);
@@ -183,3 +227,5 @@ export const mediaService = {
     }
   },
 };
+
+export default mediaService;

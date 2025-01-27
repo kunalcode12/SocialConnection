@@ -10,8 +10,6 @@ import ErrorPage from "./pages/ErrorPage";
 import UserPage from "./pages/UserPage";
 import EditPage from "./pages/EditPage";
 import UserProfile from "./pages/UserProfilePage";
-import PopularPage from "./pages/PopularPage";
-import NewestPage from "./pages/NewestPage";
 
 const router = createBrowserRouter([
   {
@@ -27,12 +25,12 @@ const router = createBrowserRouter([
       },
       {
         path: "/popular",
-        element: <PopularPage />,
+        element: <HomePage />,
         loader: popularPostLoader,
       },
       {
         path: "/newest",
-        element: <NewestPage />,
+        element: <HomePage />,
         loader: NewestPostLoader,
       },
       { path: "/community", element: <CommunityPage /> },

@@ -8,13 +8,16 @@ const fs = require('fs').promises;
 const cloudinary = require('../config/cloudinary');
 const Media = require('../models/mediaModel');
 const sharp = require('sharp');
-const ffmpeg = require('fluent-ffmpeg');
 const { Readable } = require('stream');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+
 // try {
 //   fs.mkdir(uploadDir, { recursive: true });
 // } catch (error) {
 //   console.error('Failed to create uploads directory:', error);
 // }
+ffmpeg.setFfmpegPath(ffmpegPath);
 class UploadService {
   constructor() {
     this.CHUNK_SIZE = 1024 * 1024 * 5; // 5MB chunks
@@ -65,7 +68,6 @@ class UploadService {
   }
 
   async preprocessImageChunk(tempChunkPath) {
-    console.log('Temppath:', tempChunkPath);
     try {
       await fs.access(tempChunkPath);
       return await sharp(tempChunkPath)
@@ -85,35 +87,46 @@ class UploadService {
 
   async preprocessVideoChunk(tempChunkPath) {
     return new Promise((resolve, reject) => {
-      const outputPath = path.join(
-        this.tmpDir,
-        `processed_chunk_${crypto.randomBytes(8).toString('hex')}.mp4`
-      );
+      // Validate file exists and is readable
+      fs.access(tempChunkPath)
+        .then(() => {
+          const outputPath = path.join(
+            this.tmpDir,
+            `processed_chunk_${crypto.randomBytes(8).toString('hex')}.mp4`
+          );
 
-      ffmpeg(tempChunkPath)
-        .videoCodec('libx264')
-        .size('1280x720')
-        .fps(30)
-        .videoBitrate('1500k')
-        .audioBitrate('128k')
-        .toFormat('mp4')
-        .on('end', async () => {
-          try {
-            const processedBuffer = await fs.readFile(outputPath);
-
-            // Clean up output file
-            await this.cleanupTempFile(outputPath);
-
-            resolve(processedBuffer);
-          } catch (error) {
-            reject(error);
-          }
+          ffmpeg(tempChunkPath)
+            .videoCodec('libx264')
+            .size('720x720')
+            .fps(30)
+            .videoBitrate('1500k')
+            .audioBitrate('128k')
+            .toFormat('mp4')
+            .on('start', (commandLine) => {
+              console.log('Spawned FFmpeg with command: ' + commandLine);
+            })
+            .on('end', async () => {
+              try {
+                const processedBuffer = await fs.readFile(outputPath);
+                await this.cleanupTempFile(outputPath);
+                resolve(processedBuffer);
+              } catch (error) {
+                reject(new Error(`File read error: ${error.message}`));
+              }
+            })
+            .on('error', (err) => {
+              console.error('Detailed FFmpeg Error:', {
+                message: err.message,
+                command: err.command,
+                fatal: err.fatal,
+              });
+              reject(new Error(`Video processing error: ${err.message}`));
+            })
+            .save(outputPath);
         })
-        .on('error', (err) => {
-          console.error('Video chunk processing error:', err);
-          reject(err);
-        })
-        .save(outputPath);
+        .catch((error) => {
+          reject(new Error(`File access error: ${error.message}`));
+        });
     });
   }
 

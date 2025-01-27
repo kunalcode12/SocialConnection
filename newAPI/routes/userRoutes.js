@@ -2,6 +2,11 @@ const express = require('express');
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const router = express.Router();
+const multer = require('multer');
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 5MB max file size
+});
 
 router.post('/signup', authController.signUp);
 router.post('/signin', authController.signin);
@@ -12,6 +17,12 @@ router.patch('/resetPassword/:token', authController.resetPassword);
 router.use(authController.protect);
 
 router.patch('/updateMyPassword', authController.updatePassword);
+
+router
+  .route('/profilePicture')
+  .post(upload.single('profilePicture'), userController.createProfilePicture)
+  .patch(upload.single('file'), userController.updateProfilePicture)
+  .delete(userController.deleteProfilePicture);
 
 router
   .route('/:userId/followersAndFollowAndUnfollow')

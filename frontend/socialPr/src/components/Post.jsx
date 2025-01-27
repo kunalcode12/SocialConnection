@@ -491,10 +491,11 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
       )}
 
       <CommentModal
-        post={selectedPost}
+        postId={selectedPost?._id}
         isOpen={selectedPost !== null}
         onClose={() => setSelectedPost(null)}
         userName={name}
+        onUpvote={onUpvote}
       />
     </>
   );

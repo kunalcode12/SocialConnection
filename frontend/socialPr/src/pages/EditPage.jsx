@@ -170,17 +170,31 @@ const EditPage = () => {
   }, [title, content]);
 
   // Media preview rendering
+
   const renderMediaPreview = () => {
     const mediaToShow = mediaPreview || originalMedia;
 
     if (!mediaToShow) return null;
 
+    console.log(mediaPreview);
+    console.log(originalMedia);
+
+    // Determine media type
     const mediaType = mediaPreview
-      ? mediaPreview.type
-      : originalMedia.includes(".mp4") || originalMedia.includes(".mov")
+      ? mediaPreview.file
+        ? mediaPreview.file.type.startsWith("image/")
+          ? "image"
+          : "video"
+        : mediaPreview.type
+      : typeof originalMedia === "string" &&
+        (originalMedia.includes(".mp4") || originalMedia.includes(".mov"))
       ? "video"
       : "image";
 
+    console.log(mediaToShow);
+    console.log(mediaType);
+
+    // Determine media source
     const mediaSrc = mediaPreview
       ? mediaPreview.src
       : typeof originalMedia === "string"
@@ -211,7 +225,6 @@ const EditPage = () => {
       </div>
     );
   };
-
   return (
     <>
       <AnimatePresence>

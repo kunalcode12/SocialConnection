@@ -12,10 +12,9 @@ router
 router.use(authController.protect);
 
 router.route('/category').get(contentController.contentCategory);
+router.route('/my-content/:id').get(contentController.getUserContent);
 
-router
-  .route('/trending')
-  .get(contentController.trendingContent, contentController.contentDiscovery);
+router.route('/trending').get(contentController.contentDiscovery);
 
 router.route('/deleteContent/:id').delete(contentController.deleteContent);
 

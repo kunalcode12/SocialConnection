@@ -5,11 +5,14 @@ const initialPostState = {
   posts: [],
   recentPost: [],
   upvotedContent: [],
+  totalPages: 1,
+  errorMessage: "",
   upvotingLoading: false,
   upvotingError: false,
   upvotingSuccess: false,
   bookMarkedPost: null,
   loading: false,
+  postDeleteSuccess: false,
   updatePostLoading: false,
   updatePostError: false,
   updatePostSuccess: false,
@@ -35,7 +38,7 @@ export const postSlice = createSlice({
     },
     deleteBookMark: (state, action) => {
       state.bookMarkedPost = state.bookMarkedPost.filter(
-        (post) => post.content.id !== action.payload
+        (post) => post.id !== action.payload
       );
       console.log(action, state.bookMarkedPost);
     },
@@ -64,36 +67,68 @@ export const postSlice = createSlice({
     setUpvotingSuccess: (state, action) => {
       state.upvotingSuccess = action.payload;
     },
+
     updatePostUpvote: (state, action) => {
       const postId = action.payload;
-      const post = state.posts.find((p) => p._id === postId);
+      const isUpvoted = state.upvotedContent.includes(postId);
 
-      if (post) {
-        const isUpvoted = state.upvotedContent.includes(postId);
-
-        if (isUpvoted) {
-          state.upvotedContent = state.upvotedContent.filter(
-            (id) => id !== postId
-          );
-
-          post.upVote = Math.max(0, post.upVote - 1);
-        } else {
-          state.upvotedContent.push(postId);
-
-          post.upVote += 1;
-        }
+      if (isUpvoted) {
+        state.upvotedContent = state.upvotedContent.filter(
+          (id) => id !== postId
+        );
+      } else {
+        state.upvotedContent.push(postId);
       }
+
+      const updateVoteCount = (post) => {
+        if (post) {
+          if (isUpvoted) {
+            post.upVote = Math.max(0, post.upVote - 1);
+          } else {
+            post.upVote += 1;
+          }
+        }
+      };
+
+      const mainPost = state.posts.find((p) => p._id === postId);
+      const recentPost = state.recentPost.find((p) => p._id === postId);
+
+      updateVoteCount(mainPost);
+      updateVoteCount(recentPost);
     },
+
     incrementCommentCount: (state, action) => {
-      const post = state.posts.find((post) => post._id === action.payload);
+      const postId = action.payload;
+
+      // Handle main posts array
+      const post = state.posts.find((post) => post._id === postId);
       if (post) {
         post.commentCount = (post.commentCount || 0) + 1;
       }
+
+      // Handle recent posts array
+      const recentPost = state.recentPost.find((post) => post._id === postId);
+      if (recentPost) {
+        recentPost.commentCount = (recentPost.commentCount || 0) + 1;
+      }
     },
+
     decrementCommentCount: (state, action) => {
-      const post = state.posts.find((post) => post._id === action.payload);
+      const postId = action.payload;
+
+      // Handle main posts array
+      const post = state.posts.find((post) => post._id === postId);
       if (post) {
         post.commentCount = Math.max((post.commentCount || 0) - 1, 0);
+      }
+
+      // Handle recent posts array
+      const recentPost = state.recentPost.find((post) => post._id === postId);
+      if (recentPost) {
+        recentPost.commentCount = Math.max(
+          (recentPost.commentCount || 0) - 1,
+          0
+        );
       }
     },
     setLoading: (state, action) => {
@@ -117,6 +152,9 @@ export const postSlice = createSlice({
     setSuccess: (state, action) => {
       state.success = action.payload;
     },
+    setPostDeleteSuccess: (state, action) => {
+      state.postDeleteSuccess = action.payload;
+    },
 
     setError: (state, action) => {
       state.error = action.payload;
@@ -127,6 +165,12 @@ export const postSlice = createSlice({
 
     setPosts: (state, action) => {
       state.posts = action.payload;
+    },
+    setTotalPages: (state, action) => {
+      state.totalPages = action.payload;
+    },
+    setErrorMessage: (state, action) => {
+      state.errorMessage = action.payload;
     },
     resetStates: (state) => {
       state.upvotingLoading = false;
@@ -170,37 +214,81 @@ export const {
   incrementCommentCount,
   decrementCommentCount,
   resetStates,
+  setTotalPages,
+  setErrorMessage,
+  setPostDeleteSuccess,
 } = postSlice.actions;
 export default postSlice.reducer;
 
-export const getAllContentApi = () => async (dispatch) => {
-  try {
-    dispatch(setLoading(true));
-    const response = await fetch("http://127.0.0.1:3000/api/v1/content", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    const data = await response.json();
+export const getAllContentApi =
+  (page = 1, options = {}) =>
+  async (dispatch) => {
+    try {
+      const { limit = 10, pathname = "/", categories = null } = options;
 
-    if (!response.ok)
-      throw new Error(data.message || "Failed to fetch content");
+      // Determine sort parameter based on pathname
+      let sortParam = "";
+      switch (pathname) {
+        case "/popular":
+          sortParam = "-upVote";
+          break;
+        case "/newest":
+          sortParam = "-createdAt";
+          break;
+        default:
+          sortParam = ""; // Default sorting
+      }
 
-    dispatch(setPosts(data.data.data));
-    dispatch(setLoading(false));
-    dispatch(setError(false));
-    dispatch(setSuccess(true));
-    return data;
-  } catch (error) {
-    console.log("Error fetching content:", error);
-    dispatch(setError(true));
-    dispatch(setSuccess(false));
-    dispatch(setError(error.message));
-    dispatch(setLoading(false));
-    throw error;
-  }
-};
+      // Construct query parameters
+      const queryParams = new URLSearchParams({
+        sort: sortParam,
+        limit: limit.toString(),
+        page: page.toString(),
+      });
+
+      // Add categories if provided
+      if (categories) {
+        // Convert categories to comma-separated string if it's an array
+        const categoriesParam = Array.isArray(categories)
+          ? categories.join(",")
+          : categories;
+
+        queryParams.append("categories", categoriesParam);
+      }
+
+      // Construct full URL
+      const url = `http://127.0.0.1:3000/api/v1/content?${queryParams.toString()}`;
+
+      // Fetch content
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to fetch content");
+      }
+
+      dispatch(setPosts(data.data.data));
+      dispatch(setTotalPages(data.data.totalPages));
+      dispatch(setLoading(false));
+      dispatch(setError(false));
+      dispatch(setSuccess(true));
+
+      return data;
+    } catch (error) {
+      console.log("Error fetching content:", error);
+      dispatch(setError(true));
+      dispatch(setSuccess(false));
+      dispatch(setErrorMessage(error.message));
+      dispatch(setLoading(false));
+      throw error;
+    }
+  };
 
 export const getUpvotedContentApi = (contentId) => async (dispatch) => {
   try {
@@ -252,6 +340,8 @@ export const upvoteContentApi = (contentId) => async (dispatch) => {
     if (!response.ok)
       throw new Error(data.message || "Failed to upvote content");
 
+    console.log(data.data.data);
+
     dispatch(updatePostUpvote(data.data.data.contentId));
     dispatch(setUpvotingLoading(false));
     dispatch(setUpvotingError(false));
@@ -287,12 +377,12 @@ export const deletePostApi = (postID, token) => async (dispatch) => {
     dispatch(deletePost(postID));
     dispatch(setLoading(false));
     dispatch(setError(false));
-    dispatch(setSuccess(true));
+    dispatch(setPostDeleteSuccess(true));
     return data;
   } catch (error) {
     console.log("some error");
     dispatch(setError(true));
-    dispatch(setSuccess(false));
+    dispatch(setPostDeleteSuccess(false));
     dispatch(setError(error.message));
     throw error;
   }

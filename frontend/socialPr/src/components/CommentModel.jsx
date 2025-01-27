@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,17 +17,30 @@ import {
   Trash2,
   Loader2,
   Send,
+  ImageIcon,
+  VolumeX,
+  Volume2,
+  Pause,
+  Play,
+  Award,
+  Share2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useDispatch, useSelector } from "react-redux";
-import { createComment, upvoteReply, resetStatus } from "@/store/commentSlice";
+import {
+  createComment,
+  upvoteReply,
+  resetStatus,
+  getUserVotes,
+  getComments,
+} from "@/store/commentSlice";
 import { deleteComment } from "@/store/commentSlice";
 import { replyToComment } from "@/store/commentSlice";
 import { deleteReply } from "@/store/commentSlice";
 import { upvoteComment } from "@/store/commentSlice";
 import { Alert, AlertDescription } from "./UI/Alerts";
 
-const CommentModal = ({ isOpen, onClose, userName, post }) => {
+const CommentModal = ({ isOpen, onClose, userName, postId, onUpvote }) => {
   const dispatch = useDispatch();
   const [newComment, setNewComment] = useState("");
   const [replyStates, setReplyStates] = useState({});
@@ -42,8 +55,26 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
     userVotes,
     upvoteLoading,
   } = useSelector((state) => state.comments);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(true);
+  const [videoProgress, setVideoProgress] = useState(0);
+
+  const videoRef = useRef(null);
+  const progressRef = useRef(null);
+
+  const { savingError, upvotedContent, posts, recentPost } = useSelector(
+    (state) => state.post
+  );
 
   const { user } = useSelector((state) => state.auth);
+
+  // const post = posts.find((p) => p._id === postId);
+  const post =
+    posts.find((p) => p._id === postId) ||
+    recentPost.find((p) => p._id === postId);
+
+  const sameUserPost = post?.user?._id === user?._id;
+  const isUpvoted = upvotedContent?.includes(post?._id);
 
   useEffect(() => {
     return () => {
@@ -178,6 +209,69 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
     return replyUserId === currentUserId;
   };
 
+  const handleVideoProgress = () => {
+    if (videoRef.current) {
+      const progressPercent =
+        (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      setVideoProgress(progressPercent);
+    }
+  };
+
+  const handleProgressBarClick = (e) => {
+    if (progressRef.current && videoRef.current) {
+      const progressBar = progressRef.current;
+      const clickPosition = e.nativeEvent.offsetX;
+      const progressBarWidth = progressBar.offsetWidth;
+      const clickPercentage = (clickPosition / progressBarWidth) * 100;
+      const newTime = (clickPercentage / 100) * videoRef.current.duration;
+
+      videoRef.current.currentTime = newTime;
+      setVideoProgress(clickPercentage);
+    }
+  };
+
+  const toggleVideoPlayback = () => {
+    if (videoRef.current) {
+      if (isVideoPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsVideoPlaying(!isVideoPlaying);
+    }
+  };
+
+  const toggleVideoMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isVideoMuted;
+      setIsVideoMuted(!isVideoMuted);
+    }
+  };
+
+  // const handleUpvote = (e) => {
+  //   e.preventDefault();
+  //   if (user) {
+  //     dispatch(upvoteComment(post._id));
+  //   }
+  // };
+
+  const handleUpvote = (e) => {
+    e.preventDefault();
+    if (user) onUpvote(post._id);
+  };
+
+  const handleShare = () => {
+    // Implement share functionality
+    console.log("Sharing post:", post._id);
+  };
+
+  // const isUpvoted = userVotes?.commentVotes?.some(
+  //   (vote) =>
+  //     vote.commentId === post._id &&
+  //     vote.userId === user?._id &&
+  //     vote.voteType === "upvote"
+  // );
+
   if (!post) return null;
 
   return (
@@ -209,20 +303,72 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
             </button>
 
             {/* Media Section */}
-            <div className="w-full md:w-3/5 bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center">
-              {post.url ? (
-                <video
-                  src={post.url}
-                  alt="Post content"
-                  className="w-full h-full object-contain"
-                  controls
-                />
+            <div className="w-full md:w-3/5 bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center relative">
+              {post.video ? (
+                <div className="relative w-full h-full">
+                  <video
+                    ref={videoRef}
+                    src={post.video}
+                    className="w-full h-full object-contain"
+                    muted={isVideoMuted}
+                    onTimeUpdate={handleVideoProgress}
+                    onEnded={() => setIsVideoPlaying(false)}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-300">
+                    <div
+                      ref={progressRef}
+                      className="h-full bg-blue-500 cursor-pointer"
+                      style={{ width: `${videoProgress}%` }}
+                      onClick={handleProgressBarClick}
+                    />
+                  </div>
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-4">
+                    <Button
+                      variant="ghost"
+                      className="bg-white/70 hover:bg-white/90 rounded-full p-2"
+                      onClick={toggleVideoPlayback}
+                    >
+                      {isVideoPlaying ? (
+                        <Pause className="h-6 w-6 text-gray-700" />
+                      ) : (
+                        <Play className="h-6 w-6 text-gray-700" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="bg-white/70 hover:bg-white/90 rounded-full p-2"
+                      onClick={toggleVideoMute}
+                    >
+                      {isVideoMuted ? (
+                        <VolumeX className="h-6 w-6 text-gray-700" />
+                      ) : (
+                        <Volume2 className="h-6 w-6 text-gray-700" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : post.image ? (
+                <div className="relative w-full h-full group">
+                  <img
+                    src={post.image}
+                    alt="Post content"
+                    className="w-full h-full object-contain"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                    <Button
+                      variant="ghost"
+                      className="bg-white/70 hover:bg-white/90 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <ImageIcon className="h-6 w-6 text-gray-700" />
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <img
                     src="/api/placeholder/400/400"
                     alt="Placeholder"
-                    className="opacity-30 transition-opacity duration-300 hover:opacity-40"
+                    className="opacity-30"
                   />
                 </div>
               )}
@@ -470,27 +616,49 @@ const CommentModal = ({ isOpen, onClose, userName, post }) => {
               </div>
 
               {/* Interaction Bar */}
-              <div className="border-t p-4 bg-white/95 backdrop-blur-sm">
-                <div className="flex justify-between mb-3">
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="hover:bg-gray-100 transition-all duration-200 group"
-                    >
-                      <ArrowBigUp className="h-5 w-5 mr-1 group-hover:text-blue-500 transition-colors" />
-                      <span className="font-bold">{post.upVote || 0}</span>
-                      <ArrowBigDown className="h-5 w-5 ml-1 group-hover:text-blue-500 transition-colors" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="hover:bg-gray-100 transition-all duration-200 group"
-                    >
-                      <MessageCircle className="h-4 w-4 mr-1 group-hover:text-blue-500" />
-                      <span>{comments.length}</span>
-                    </Button>
-                  </div>
+              <div className="border-b p-4">
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="ghost"
+                    className={`hover:bg-gray-100 rounded-full transition-colors ${
+                      isUpvoted ? "bg-red-50" : ""
+                    }`}
+                    onClick={handleUpvote}
+                    disabled={!user}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <ArrowBigUp
+                        className={`h-7 w-7 transition-colors ${
+                          isUpvoted
+                            ? "text-red-500"
+                            : "text-gray-500 group-hover:text-red-500"
+                        }`}
+                      />
+                      <span
+                        className={`font-bold ${
+                          isUpvoted ? "text-red-500" : "text-gray-700"
+                        }`}
+                      >
+                        {post.upVote || 0}
+                      </span>
+                    </div>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="hover:bg-gray-100 rounded-full space-x-2"
+                  >
+                    <MessageSquare className="h-5 w-5 text-gray-500" />
+                    <span className="font-medium">{comments?.length || 0}</span>
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    className="hover:bg-gray-100 rounded-full space-x-2"
+                    onClick={handleShare}
+                  >
+                    <Share2 className="h-5 w-5 text-gray-500" />
+                    <span className="font-medium">Share</span>
+                  </Button>
                 </div>
               </div>
 

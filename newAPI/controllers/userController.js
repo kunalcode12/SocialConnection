@@ -2,6 +2,10 @@ const Content = require('../models/contentModel');
 const User = require('../models/userModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const uploadService = require('../services/uploadService');
+const fs = require('fs-extra');
+const path = require('path');
+const os = require('os');
 
 const filterObj = (obj, ...allowedFields) => {
   const newObj = {};
@@ -26,11 +30,11 @@ exports.getMeUser = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.params.id)
     .populate({
       path: 'contents',
-      select: 'title upVote downVote description createdAt -user url',
+      select: 'title upVote downVote description  -user ',
     })
     .populate({
       path: 'bookmarkedCont.content',
-      select: 'title upVote downVote description createdAt  url',
+      select: 'title upVote downVote description user createdAt  url',
     });
 
   if (!user) {
@@ -45,17 +49,12 @@ exports.getMeUser = catchAsync(async (req, res, next) => {
 });
 
 exports.getUser = catchAsync(async (req, res, next) => {
-  const user = await User.findById(req.params.id)
-    .populate({
-      path: 'contents',
-      select:
-        'title upVote downVote description createdAt -user url image video commentCount mediaId uploadId',
-    })
-    .populate({
-      path: 'bookmarkedCont.content',
-      select:
-        'title upVote downVote description user createdAt url image video commentCount mediaId uploadId',
-    });
+  const user = await User.findById(req.params.id);
+  // .populate({
+  //   path: 'bookmarkedCont.content',
+  //   select:
+  //     'title upVote downVote description user createdAt url image video commentCount mediaId uploadId',
+  // });
 
   if (!user) {
     return next(new AppError('No user found by this ID', 404));
@@ -337,4 +336,187 @@ exports.getFollowerStats = catchAsync(async (req, res, next) => {
       },
     },
   });
+});
+
+exports.createProfilePicture = catchAsync(async (req, res, next) => {
+  const file = req.file;
+  console.log(file);
+
+  // Validate input
+  if (!file) {
+    return next(new AppError('No image file uploaded', 400));
+  }
+
+  // Validate file type
+  if (!file.mimetype.startsWith('image/')) {
+    return next(new AppError('Please upload only image files', 400));
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  // Check if user already has a profile picture
+  if (user.profilePicture) {
+    return next(
+      new AppError(
+        'Profile picture already exists. Use update endpoint instead.',
+        400
+      )
+    );
+  }
+
+  let tempChunkPath;
+
+  try {
+    // Create temporary file path
+    tempChunkPath = path.join(
+      os.tmpdir(),
+      `temp_profile_${Date.now()}${path.extname(file.originalname)}`
+    );
+
+    // Write file to temporary location
+    await fs.writeFile(tempChunkPath, file.buffer);
+
+    // Preprocess the image
+    const processedBuffer = await uploadService.preprocessImageChunk(
+      tempChunkPath
+    );
+
+    // Clean up temporary file
+    await fs.remove(tempChunkPath).catch((err) => {
+      console.warn(`Could not remove temporary file: ${err.message}`);
+    });
+
+    // Upload profile picture to Cloudinary
+    const result = await uploadService.uploadToCloudinary1(
+      processedBuffer,
+      'image'
+    );
+
+    // Update user with profile picture URL
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { profilePicture: result.secure_url },
+      { new: true, runValidators: true }
+    );
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        user: updatedUser,
+      },
+    });
+  } catch (error) {
+    console.error('Profile picture creation error:', error);
+    return next(new AppError('Failed to create profile picture', 500));
+  }
+});
+
+exports.updateProfilePicture = catchAsync(async (req, res, next) => {
+  const file = req.file;
+
+  // Validate input
+  if (!file) {
+    return next(new AppError('No image file uploaded', 400));
+  }
+
+  // Validate file type
+  if (!file.mimetype.startsWith('image/')) {
+    return next(new AppError('Please upload only image files', 400));
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  let tempChunkPath;
+
+  try {
+    // Create temporary file path
+    tempChunkPath = path.join(
+      os.tmpdir(),
+      `temp_profile_${Date.now()}${path.extname(file.originalname)}`
+    );
+
+    // Write file to temporary location
+    await fs.writeFile(tempChunkPath, file.buffer);
+
+    // Preprocess the image
+    const processedBuffer = await uploadService.preprocessImageChunk(
+      tempChunkPath
+    );
+
+    // Clean up temporary file
+    await fs.remove(tempChunkPath).catch((err) => {
+      console.warn(`Could not remove temporary file: ${err.message}`);
+    });
+
+    // Delete existing profile picture from Cloudinary if it exists
+    if (user.profilePicture) {
+      const publicId = user.profilePicture.split('/').pop().split('.')[0];
+      await uploadService.deleteFromCloud(publicId, 'image');
+    }
+
+    // Upload new profile picture to Cloudinary
+    const result = await uploadService.uploadToCloudinary1(
+      processedBuffer,
+      'image'
+    );
+
+    // Update user's profile picture URL
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { profilePicture: result.secure_url },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: updatedUser,
+      },
+    });
+  } catch (error) {
+    console.error('Profile picture update error:', error);
+    return next(new AppError('Failed to update profile picture', 500));
+  }
+});
+
+exports.deleteProfilePicture = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  // Check if user has a profile picture to delete
+  if (!user.profilePicture) {
+    return next(new AppError('No profile picture to delete', 400));
+  }
+
+  try {
+    // Extract public ID from profile picture URL
+    const publicId = user.profilePicture.split('/').pop().split('.')[0];
+
+    // Delete from Cloudinary
+    await uploadService.deleteFromCloud(publicId, 'image');
+
+    // Remove profile picture URL from user document
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $unset: { profilePicture: 1 } },
+      { new: true }
+    );
+
+    res.status(204).json({
+      status: 'success',
+      data: null,
+    });
+  } catch (error) {
+    console.error('Profile picture deletion error:', error);
+    return next(new AppError('Failed to delete profile picture', 500));
+  }
 });

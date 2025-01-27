@@ -8,21 +8,35 @@ import {
   Send,
   Eye,
   X,
+  Check,
 } from "lucide-react";
 import { Button } from "../components/UI/Button";
 import { Input } from "../components/UI/Input";
 import { Textarea } from "../components/UI/TextArea";
 
-import FileUpload from "../components/FileUplaod";
-import PostPreview from "../components/PostPreview";
 import { useCallback, useMemo } from "react";
-import { Form } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { addPost, setLoading, setError } from "../store/postSlice";
 import { useSelector } from "react-redux";
-import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { mediaService } from "@/services/mediaService";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/UI/dropdown-menu";
+
+const categories = [
+  "Education",
+  "Entertainment",
+  "Music",
+  "Sports",
+  "Technology",
+  "Travel",
+  "Food & Drink",
+  "Art & Design",
+];
 
 const EnhancedSubmitPage = () => {
   const dispatch = useDispatch();
@@ -40,6 +54,7 @@ const EnhancedSubmitPage = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedMediaUrl, setUploadedMediaUrl] = useState(null);
   const [mediaUploadInfo, setMediaUploadInfo] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState("");
 
   const fileInputRef = useRef(null);
   const loading = useSelector((state) => state.post.loading);
@@ -136,7 +151,7 @@ const EnhancedSubmitPage = () => {
           title: title,
           description: content,
           url: link || uploadedMediaUrl,
-          category: "education",
+          category: selectedCategory.toLowerCase(),
           ...(activeButton === "image" && {
             image: uploadedMediaUrl,
             mediaId: mediaUploadInfo?.media?._id,
@@ -191,12 +206,13 @@ const EnhancedSubmitPage = () => {
   const isSubmitEnabled = useMemo(() => {
     return (
       title.trim().length > 1 &&
+      selectedCategory !== "" &&
       (content.trim().length > 1 ||
         (activeButton === "image" && uploadedMediaUrl) ||
         (activeButton === "video" && uploadedMediaUrl) ||
         (activeButton === "link" && link.trim().length > 0))
     );
-  }, [title, content, activeButton, uploadedMediaUrl, link]);
+  }, [title, content, activeButton, uploadedMediaUrl, link, selectedCategory]);
 
   const submitButtonClass = useMemo(() => {
     const baseClass = "flex items-center";
@@ -252,16 +268,50 @@ const EnhancedSubmitPage = () => {
 
       <form onSubmit={handleSubmit} className="space-y-10">
         {/* Title Input */}
-        <Input
-          type="text"
-          id="title"
-          placeholder="Title"
-          value={title}
-          name="title"
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full p-4 rounded-xl border"
-          required
-        />
+        <div className="flex gap-4 items-center">
+          <div className="flex-1">
+            <Input
+              type="text"
+              id="title"
+              placeholder="Title"
+              value={title}
+              name="title"
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full p-4 rounded-xl border"
+              required
+            />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-[180px] justify-between">
+                {selectedCategory || "Category"}
+                {selectedCategory && (
+                  <X
+                    className="w-4 h-4 ml-2 hover:text-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCategory("");
+                    }}
+                  />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[180px]">
+              {categories.map((category) => (
+                <DropdownMenuItem
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className="flex items-center justify-between"
+                >
+                  {category}
+                  {selectedCategory === category && (
+                    <Check className="w-4 h-4 ml-2" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         {/* Content Type Buttons */}
         <div className="space-y-4">

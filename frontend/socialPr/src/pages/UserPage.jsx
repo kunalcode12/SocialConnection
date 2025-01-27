@@ -1,38 +1,26 @@
 import { useCallback, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/UI/Avatar";
 import { Button } from "../components/UI/Button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../components/UI/CardComp";
+
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "../components/UI/Tabs";
-import {
-  Award,
-  Calendar,
-  Cake,
-  Gift,
-  UserX,
-  Users,
-  MessageCircle,
-} from "lucide-react";
+import { UserX, Users, MessageCircle } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
-import { fetchUserData } from "../store/authSlice";
+import {
+  fetchUserData,
+  resetStatus,
+  setProfileImage,
+} from "../store/authSlice";
 import { useEffect } from "react";
 import LoadingBar from "../components/UI/LoadingBar";
-import UserPost from "../components/UserPost";
-import { setPosts, upvoteContentApi } from "../store/postSlice";
+
 import { Outlet } from "react-router-dom";
-import { setBookMarkedPost } from "../store/postSlice";
-import SavedContent from "@/components/SavedContent";
-import { useMemo } from "react";
+
 import {
   Dialog,
   DialogContent,
@@ -45,21 +33,127 @@ import {
   getFollowing,
   unfollowUser,
 } from "@/store/followSlice";
+import UserMainContent from "@/components/UserMainContent";
+import ProfileImageDialog from "@/components/ProfileImageDialog";
+import mediaService from "@/services/mediaService";
 
 export default function UserProfile() {
   const location = useLocation();
   const { userId } = useParams();
   const dispatch = useDispatch();
-  const { user, profileUser, loading, error } = useSelector(
-    (state) => state.auth
+  const { user, profileUser, loading, error, updateProfileSuccess } =
+    useSelector((state) => state.auth);
+
+  const profilePicture = useSelector(
+    (state) =>
+      state.auth.profilePicture ||
+      state.auth.profileUser?.userData?.profilePicture
   );
+
   const [isFollowing, setIsFollowing] = useState(false);
   const [showFollowDialog, setShowFollowDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("followers");
   const [followInProgress, setFollowInProgress] = useState(false);
+  const [isProfileImageDialogOpen, setIsProfileImageDialogOpen] =
+    useState(false);
+
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
   const navigate = useNavigate();
 
   const token = localStorage.getItem("token");
+
+  const handleCreateNewProfileImage = async (file) => {
+    if (!file) return;
+
+    try {
+      setIsImageUploading(true);
+      const response = await mediaService.createProfilePicture(file);
+
+      if (response.status === "success") {
+        dispatch(setProfileImage(response.data.user.profilePicture));
+        setIsProfileImageDialogOpen(false);
+        // dispatch(fetchUserData(userId, token));
+      }
+    } catch (error) {
+      setIsProfileImageDialogOpen(false);
+      console.error("Error creating profile picture:", error);
+    } finally {
+      setIsImageUploading(false);
+    }
+  };
+
+  const handleUpdateProfileImage = async (file) => {
+    if (!file) return;
+
+    try {
+      setIsImageUploading(true);
+      const response = await mediaService.updateMedia(
+        null,
+        file,
+        "image",
+        null,
+        true
+      );
+
+      if (response.status === "success") {
+        console.log(response);
+        dispatch(setProfileImage(response.data.user.profilePicture));
+        setIsProfileImageDialogOpen(false);
+        // dispatch(fetchUserData(userId, token));
+      }
+    } catch (error) {
+      console.error("Error updating profile picture:", error);
+      setIsProfileImageDialogOpen(false);
+    } finally {
+      setIsImageUploading(false);
+    }
+  };
+
+  const handleDeleteProfileImage = async () => {
+    try {
+      setIsDeletingImage(true);
+      const response = await mediaService.deleteMedia(null, true);
+      console.log(response);
+
+      if (response.success) {
+        dispatch(setProfileImage(null));
+        setIsProfileImageDialogOpen(false);
+      }
+    } catch (error) {
+      console.error("Error deleting profile picture:", error);
+      setIsProfileImageDialogOpen(false);
+    } finally {
+      setIsDeletingImage(false);
+    }
+  };
+
+  const handleProfileImageSelect = useCallback(
+    async (file) => {
+      // Check if we have a profile picture in either profileUser or profilePicture
+      const hasProfilePicture = Boolean(
+        profileUser?.userData?.avatar || profilePicture
+      );
+
+      if (hasProfilePicture) {
+        await handleUpdateProfileImage(file);
+      } else {
+        await handleCreateNewProfileImage(file);
+      }
+    },
+    [profileUser, profilePicture]
+  );
+
+  useEffect(() => {
+    if (updateProfileSuccess) {
+      const redirectTimer = setTimeout(() => {
+        // Reset the success state to prevent multiple redirects
+        dispatch(resetStatus());
+      }, 2000);
+
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [updateProfileSuccess, dispatch]);
 
   useEffect(() => {
     dispatch(getFollowers(userId));
@@ -76,9 +170,6 @@ export default function UserProfile() {
       const isUserFollowing = followers.some(
         (follower) => follower._id === user._id
       );
-
-      console.log(user._id);
-      console.log(isUserFollowing);
 
       setIsFollowing(isUserFollowing);
     }
@@ -111,17 +202,6 @@ export default function UserProfile() {
     }
   };
 
-  const handleUpvote = useCallback(
-    (postId) => {
-      try {
-        dispatch(upvoteContentApi(postId));
-      } catch (error) {
-        console.error("Upvote failed:", error);
-      }
-    },
-    [dispatch]
-  );
-
   const handleClick = (userID) => {
     navigate(`/user/${userID}`);
     setShowFollowDialog(false);
@@ -133,33 +213,8 @@ export default function UserProfile() {
     }
   }, [userId, token, dispatch]);
 
-  const isLoggedInUserProfile = user?._id === profileUser?._id;
+  const isLoggedInUserProfile = user?._id === userId;
   const renderData = profileUser;
-
-  useEffect(() => {
-    if (renderData) {
-      dispatch(setPosts(renderData.contents));
-    }
-  }, [renderData, dispatch]);
-
-  const selectPostState = (state) => state.post;
-  const { posts, bookMarkedPost } = useSelector(selectPostState);
-
-  useEffect(() => {
-    if (profileUser?.bookmarkedCont && profileUser.bookmarkedCont.length > 0) {
-      dispatch(setBookMarkedPost(profileUser.bookmarkedCont));
-    }
-  }, [profileUser?.bookmarkedCont, dispatch]);
-
-  const memoizedSavedContent = useMemo(
-    () => (
-      <SavedContent
-        bookmarkedCont={profileUser?.bookmarkedCont}
-        bookMarkedPost={bookMarkedPost}
-      />
-    ),
-    [profileUser?.bookmarkedCont, bookMarkedPost]
-  );
 
   const FollowButton = () => (
     <Button
@@ -324,17 +379,38 @@ export default function UserProfile() {
             <div className="flex items-center space-x-6">
               <div className="relative">
                 <Avatar className="w-24 h-24 border-4 border-white shadow-xl hover:shadow-2xl transition-shadow">
-                  <AvatarImage
-                    src="/placeholder.svg?height=96&width=96"
-                    alt={renderData.name}
-                  />
-                  <AvatarFallback className="text-2xl">
-                    {renderData.name.substring(0, 2).toUpperCase()}
-                  </AvatarFallback>
+                  <div
+                    onClick={() =>
+                      isLoggedInUserProfile && setIsProfileImageDialogOpen(true)
+                    }
+                    className={isLoggedInUserProfile ? "cursor-pointer" : ""}
+                  >
+                    {profilePicture ? (
+                      <AvatarImage
+                        src={
+                          profilePicture ||
+                          "/placeholder.svg?height=96&width=96"
+                        }
+                        alt={renderData.userData.name}
+                      />
+                    ) : (
+                      <AvatarImage
+                        src={
+                          renderData.userData.avatar ||
+                          "/placeholder.svg?height=96&width=96"
+                        }
+                        alt={renderData.userData.name}
+                      />
+                    )}
+
+                    <AvatarFallback className="text-2xl">
+                      {renderData.userData.name.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </div>
                 </Avatar>
               </div>
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold text-gray-900">{`u/${renderData.name}`}</h1>
+                <h1 className="text-3xl font-bold text-gray-900">{`u/${renderData.userData.name}`}</h1>
                 <FollowersSection />
               </div>
             </div>
@@ -367,100 +443,20 @@ export default function UserProfile() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row gap-8">
-        <div className="md:w-2/3">
-          <Tabs defaultValue="overview" className="w-full">
-            {isLoggedInUserProfile && (
-              <TabsList className="w-full justify-start bg-white rounded-lg h-12 mb-6">
-                <TabsTrigger value="overview" className="px-8">
-                  OVERVIEW
-                </TabsTrigger>
-                <TabsTrigger value="saved" className="px-8">
-                  SAVED
-                </TabsTrigger>
-              </TabsList>
-            )}
-
-            <TabsContent value="overview" className="space-y-4">
-              {renderData.contents && renderData.contents.length > 0 ? (
-                posts.map((post) => (
-                  <UserPost
-                    key={post?._id}
-                    post={post}
-                    id={renderData?._id}
-                    name={renderData.name}
-                    onUpvote={handleUpvote}
-                    currentUser={user}
-                  />
-                ))
-              ) : (
-                <Card className="p-8 text-center">
-                  <p className="text-gray-500">No posts yet</p>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="saved">{memoizedSavedContent}</TabsContent>
-          </Tabs>
-        </div>
-
-        <div className="md:w-1/3 space-y-6">
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-              <CardTitle>Karma</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">4,781</p>
-                  <p className="text-sm text-gray-600">Post Karma</p>
-                </div>
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-600">10,283</p>
-                  <p className="text-sm text-gray-600">Comment Karma</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-              <CardTitle className="flex items-center">
-                <Cake className="w-5 h-5 mr-2" />
-                Cake day
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="flex items-center text-gray-700">
-                <Calendar className="w-5 h-5 mr-3 text-purple-500" />
-                <span>May 24, 2018</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
-              <CardTitle>Trophy Case</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex items-center text-gray-700">
-                <Award className="w-5 h-5 mr-3 text-yellow-500" />
-                <span>Verified Email</span>
-              </div>
-              <div className="flex items-center text-gray-700">
-                <Gift className="w-5 h-5 mr-3 text-red-500" />
-                <span>Secret Santa</span>
-              </div>
-              <div className="flex items-center text-gray-700">
-                <Calendar className="w-5 h-5 mr-3 text-green-500" />
-                <span>One-Year Club</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      <UserMainContent />
       <Outlet />
       <FollowDialog />
+      <ProfileImageDialog
+        initialImage={profilePicture}
+        isOpen={isProfileImageDialogOpen}
+        onClose={() => setIsProfileImageDialogOpen(false)}
+        onImageSelect={handleProfileImageSelect}
+        onDeleteImage={handleDeleteProfileImage}
+        updateSuccess={updateProfileSuccess}
+        userId={userId}
+        isLoading={isImageUploading}
+        isDeletingImage={isDeletingImage}
+      />
     </div>
   );
 }

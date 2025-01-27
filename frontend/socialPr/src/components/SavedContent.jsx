@@ -2,15 +2,16 @@ import { memo } from "react";
 import UserPost from "../components/UserPost";
 
 const SavedContent = memo(({ bookmarkedCont, bookMarkedPost }) => {
+  console.log(bookmarkedCont);
   return (
     <>
       {bookmarkedCont && bookmarkedCont.length > 0 ? (
         bookMarkedPost?.map((post) => (
           <UserPost
-            key={post?.content._id}
-            post={post?.content}
-            id={post?.content.user}
-            name={"someUser"}
+            key={post?._id}
+            post={post}
+            id={post?.user._id}
+            name={post?.user.name}
             isbookMarkedPost={true}
           />
         ))

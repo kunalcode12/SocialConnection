@@ -9,6 +9,8 @@ const redis = require('redis');
 const { promisify } = require('util');
 const multer = require('multer');
 const Content = require('../models/contentModel');
+const os = require('os');
+const fs = require('fs-extra');
 // const upload = multer({
 //   storage: multer.memoryStorage(),
 //   limits: { fileSize: 50 * 1024 * 1024 }, // 5MB max file size
@@ -119,6 +121,99 @@ exports.getUploadStatus = catchAsync(async (req, res, next) => {
   });
 });
 
+// exports.updateMedia = catchAsync(async (req, res, next) => {
+//   const { id } = req.params;
+//   const { typeFile, contentId } = req.body;
+//   const file = req.file;
+
+//   // Validate input
+//   if (!file) {
+//     return res.status(400).json({
+//       status: 'error',
+//       message: 'No file uploaded',
+//     });
+//   }
+
+//   // Find existing media
+//   const existingMedia = await Media.findById(id);
+
+//   if (!existingMedia) {
+//     return next(new appError('Media not found', 404));
+//   }
+
+//   try {
+//     // Upload the file to Cloudinary
+//     const result = await uploadService.uploadToCloudinary1(
+//       file.buffer, // Pass buffer directly
+//       typeFile // Pass media type
+//     );
+
+//     console.log('typeFile:', typeFile);
+
+//     // Delete existing Cloudinary file if it exists
+
+//     if (existingMedia.cloudinaryPublicId) {
+//       await uploadService.deleteFromCloud(
+//         existingMedia.cloudinaryPublicId,
+//         existingMedia.type
+//       );
+//     }
+
+//     // Update the existing media document
+//     const updatedMedia = await Media.findByIdAndUpdate(
+//       id,
+//       {
+//         url: result.secure_url, // Use secure_url
+//         cloudinaryPublicId: result.public_id,
+//         status: 'completed',
+//         type: typeFile,
+//         metadata: {
+//           ...existingMedia.metadata,
+//           size: file.size,
+//           contentType: typeFile,
+//         },
+//       },
+//       {
+//         new: true,
+//         runValidators: true,
+//       }
+//     );
+
+//     // Update Content if contentId is provided
+//     let updatedContent = null;
+//     if (contentId) {
+//       const contentUpdateFields = {};
+
+//       // Update URL based on media type
+//       if (typeFile === 'image') {
+//         contentUpdateFields.image = result.secure_url;
+//         contentUpdateFields.video = null;
+//       } else if (typeFile === 'video') {
+//         contentUpdateFields.video = result.secure_url;
+//         contentUpdateFields.image = null;
+//       }
+
+//       updatedContent = await Content.findByIdAndUpdate(
+//         contentId,
+//         contentUpdateFields,
+//         { new: true }
+//       );
+//     }
+
+//     res.status(200).json({
+//       status: 'success',
+//       data: {
+//         url: result.secure_url,
+//         media: updatedMedia,
+//         content: updatedContent,
+//       },
+//     });
+//   } catch (error) {
+//     console.error('Media replacement error:', error);
+//     return next(new appError('Failed to replace media', 500));
+//   }
+// });
+
 exports.updateMedia = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const { typeFile, contentId } = req.body;
@@ -139,17 +234,38 @@ exports.updateMedia = catchAsync(async (req, res, next) => {
     return next(new appError('Media not found', 404));
   }
 
+  let tempChunkPath;
+
   try {
-    // Upload the file to Cloudinary
+    // Preprocess the file based on type
+    tempChunkPath = path.join(
+      os.tmpdir(),
+      `temp_${typeFile}_${Date.now()}${path.extname(file.originalname)}`
+    );
+
+    await fs.writeFile(tempChunkPath, file.buffer);
+    let processedBuffer;
+    if (typeFile === 'image') {
+      processedBuffer = await uploadService.preprocessImageChunk(tempChunkPath);
+    } else if (typeFile === 'video') {
+      processedBuffer = await uploadService.preprocessVideoChunk(tempChunkPath);
+    } else {
+      processedBuffer = file.buffer;
+    }
+
+    await fs.remove(tempChunkPath).catch((err) => {
+      console.warn(`Could not remove temporary file: ${err.message}`);
+    });
+
+    // Upload the processed file to Cloudinary
     const result = await uploadService.uploadToCloudinary1(
-      file.buffer, // Pass buffer directly
+      processedBuffer, // Use processed buffer
       typeFile // Pass media type
     );
 
     console.log('typeFile:', typeFile);
 
     // Delete existing Cloudinary file if it exists
-
     if (existingMedia.cloudinaryPublicId) {
       await uploadService.deleteFromCloud(
         existingMedia.cloudinaryPublicId,
@@ -167,7 +283,7 @@ exports.updateMedia = catchAsync(async (req, res, next) => {
         type: typeFile,
         metadata: {
           ...existingMedia.metadata,
-          size: file.size,
+          size: processedBuffer.length, // Use processed buffer size
           contentType: typeFile,
         },
       },

@@ -45,6 +45,7 @@ import {
   setError,
   unsavedPostApi,
   savePostApi,
+  upvoteContentApi,
 } from "../store/postSlice";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation, Link } from "react-router-dom";
@@ -75,7 +76,6 @@ const UserPost = memo(
     const dropdownRef = useRef(null);
     const buttonRef = useRef(null);
     const dispatch = useDispatch();
-    console.log(post);
 
     const { user, isAuthenticated, token } = useSelector((state) => state.auth);
     const { loading, upvotedContent } = useSelector((state) => state.post);
@@ -95,7 +95,18 @@ const UserPost = memo(
       setShowDropdown((prev) => !prev);
     }, []);
 
-    const { isError, success } = useSelector((state) => state.post);
+    // const handleUpvote = useCallback(
+    //   (postId) => {
+    //     try {
+    //       dispatch(upvoteContentApi(postId));
+    //     } catch (error) {
+    //       console.error("Upvote failed:", error);
+    //     }
+    //   },
+    //   [dispatch]
+    // );
+
+    const { isError, postDeleteSuccess } = useSelector((state) => state.post);
 
     const handleDropdownOptionClick = useCallback(
       (option, post) => {
@@ -134,6 +145,10 @@ const UserPost = memo(
         if (result.success || result.status === "success") {
           dispatch(deletePostApi(post._id, token));
           setShowDeleteConfirmation(false);
+
+          setTimeout(() => {
+            dispatch(setSuccess(false));
+          }, 2000);
         } else {
           dispatch(deletePostApi(post._id, token));
           setShowDeleteConfirmation(false);
@@ -228,15 +243,15 @@ const UserPost = memo(
     // Success/Error message timer
     useEffect(() => {
       let timer;
-      if (success || isError) {
+      if (isError) {
         timer = setTimeout(() => {
-          success ? dispatch(setSuccess(false)) : dispatch(setError(false));
+          dispatch(setError(false));
         }, 3000);
       }
       return () => {
         if (timer) clearTimeout(timer);
       };
-    }, [success, isError, dispatch]);
+    }, [isError, dispatch]);
 
     return (
       <>
@@ -253,7 +268,7 @@ const UserPost = memo(
               Unable to delete the post
             </motion.div>
           )}
-          {success && (
+          {postDeleteSuccess && (
             <motion.div
               initial={{ opacity: 0, y: -50 }}
               animate={{ opacity: 1, y: 0 }}
@@ -605,10 +620,11 @@ const UserPost = memo(
 
         {/* Comment Modal */}
         <CommentModal
-          post={selectedPost}
+          postId={selectedPost?._id}
           isOpen={selectedPost !== null}
           onClose={() => setSelectedPost(null)}
           userName={name}
+          onUpvote={onUpvote}
         />
       </>
     );
