@@ -26,7 +26,6 @@ const RecentPosts = () => {
 
   const { user } = useSelector((state) => state.auth);
   const { recentPost } = useSelector((state) => state.post);
-  console.log(recentPost);
 
   const fetchData = useCallback(async () => {
     try {
@@ -212,6 +211,7 @@ const RecentPosts = () => {
         onClose={() => setSelectedPost(null)}
         userName={selectedPost?.user?.name}
         onUpvote={handleUpvote}
+        id={selectedPost?.user?._id}
       />
     </>
   );

@@ -27,7 +27,7 @@ router
 
 router
   .route('/:id')
-  .get()
+  .get(contentController.getContent)
   .patch(authController.restrictTo('user'), contentController.updateContent);
 
 module.exports = router;

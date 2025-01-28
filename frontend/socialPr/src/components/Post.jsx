@@ -198,7 +198,10 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
             <div className="flex items-center space-x-3">
               <Avatar className="w-8 h-8 ring-2 ring-gray-100">
                 <AvatarImage
-                  src="/placeholder.svg?height=32&width=32"
+                  src={
+                    post?.user.profilePicture ||
+                    "/placeholder.svg?height=32&width=32"
+                  }
                   alt={`${name}'s avatar`}
                   className="object-cover"
                 />
@@ -496,6 +499,7 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
         onClose={() => setSelectedPost(null)}
         userName={name}
         onUpvote={onUpvote}
+        id={id}
       />
     </>
   );

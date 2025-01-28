@@ -7,6 +7,7 @@ const voteRouter = require('./routes/voteRoutes');
 const flaggedRoutes = require('./routes/flaggedRoutes');
 const commentsRouter = require('./routes/commentRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 const AppError = require('./utils/appError');
 const app = express();
 const globalErrorHandler = require('./controllers/errorController');
@@ -25,6 +26,7 @@ app.use('/api/v1/votes', voteRouter);
 app.use('/api/v1/flagged', flaggedRoutes);
 app.use('/api/v1/comment', commentsRouter);
 app.use('/api/v1/media', mediaRoutes);
+app.use('/api/v1/searching', searchRoutes);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server`, 404));

@@ -5,6 +5,9 @@ const initialPostState = {
   posts: [],
   recentPost: [],
   upvotedContent: [],
+  onePost: null,
+  onePostSuccess: false,
+  onePostError: false,
   totalPages: 1,
   errorMessage: "",
   upvotingLoading: false,
@@ -35,6 +38,15 @@ export const postSlice = createSlice({
     },
     setBookMarkedPost: (state, action) => {
       state.bookMarkedPost = action.payload;
+    },
+    setOnePost: (state, action) => {
+      state.onePost = action.payload;
+    },
+    setOnePostSuccess: (state, action) => {
+      state.onePostSuccess = action.payload;
+    },
+    setOnePostError: (state, action) => {
+      state.onePostError = action.payload;
     },
     deleteBookMark: (state, action) => {
       state.bookMarkedPost = state.bookMarkedPost.filter(
@@ -68,10 +80,40 @@ export const postSlice = createSlice({
       state.upvotingSuccess = action.payload;
     },
 
+    // updatePostUpvote: (state, action) => {
+    //   const postId = action.payload;
+    //   const isUpvoted = state.upvotedContent.includes(postId);
+
+    //   if (isUpvoted) {
+    //     state.upvotedContent = state.upvotedContent.filter(
+    //       (id) => id !== postId
+    //     );
+    //   } else {
+    //     state.upvotedContent.push(postId);
+    //   }
+
+    //   const updateVoteCount = (post) => {
+    //     if (post) {
+    //       if (isUpvoted) {
+    //         post.upVote = Math.max(0, post.upVote - 1);
+    //       } else {
+    //         post.upVote += 1;
+    //       }
+    //     }
+    //   };
+
+    //   const mainPost = state.posts.find((p) => p._id === postId);
+    //   const recentPost = state.recentPost.find((p) => p._id === postId);
+
+    //   updateVoteCount(mainPost);
+    //   updateVoteCount(recentPost);
+    // },
+
     updatePostUpvote: (state, action) => {
       const postId = action.payload;
       const isUpvoted = state.upvotedContent.includes(postId);
 
+      // Update upvotedContent array
       if (isUpvoted) {
         state.upvotedContent = state.upvotedContent.filter(
           (id) => id !== postId
@@ -80,21 +122,32 @@ export const postSlice = createSlice({
         state.upvotedContent.push(postId);
       }
 
-      const updateVoteCount = (post) => {
-        if (post) {
-          if (isUpvoted) {
-            post.upVote = Math.max(0, post.upVote - 1);
-          } else {
-            post.upVote += 1;
-          }
+      // Update the onePost object if it matches the postId
+      if (state.onePost && state.onePost._id === postId) {
+        if (isUpvoted) {
+          // Decrease upvote count, ensuring it doesn't go below 0
+          state.onePost.upVote = Math.max(0, state.onePost.upVote - 1);
+        } else {
+          // Increase upvote count
+          state.onePost.upVote += 1;
         }
-      };
+      }
 
+      // Optional: Update posts and recentPost arrays if they exist
       const mainPost = state.posts.find((p) => p._id === postId);
       const recentPost = state.recentPost.find((p) => p._id === postId);
 
-      updateVoteCount(mainPost);
-      updateVoteCount(recentPost);
+      if (mainPost) {
+        mainPost.upVote = isUpvoted
+          ? Math.max(0, mainPost.upVote - 1)
+          : mainPost.upVote + 1;
+      }
+
+      if (recentPost) {
+        recentPost.upVote = isUpvoted
+          ? Math.max(0, recentPost.upVote - 1)
+          : recentPost.upVote + 1;
+      }
     },
 
     incrementCommentCount: (state, action) => {
@@ -185,6 +238,8 @@ export const postSlice = createSlice({
       state.error = null;
       state.isError = false;
       state.success = false;
+      state.onePostError = false;
+      state.onePostSuccess = false;
     },
   },
 });
@@ -217,6 +272,9 @@ export const {
   setTotalPages,
   setErrorMessage,
   setPostDeleteSuccess,
+  setOnePost,
+  setOnePostError,
+  setOnePostSuccess,
 } = postSlice.actions;
 export default postSlice.reducer;
 
@@ -289,6 +347,41 @@ export const getAllContentApi =
       throw error;
     }
   };
+
+export const getcontent = (contentId) => async (dispatch) => {
+  try {
+    dispatch(setLoading(true));
+    const response = await fetch(
+      `http://127.0.0.1:3000/api/v1/content/${contentId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const data = await response.json();
+
+    if (!response.ok)
+      throw new Error(data.message || "Failed to fetch upvoted content");
+
+    console.log(data);
+
+    dispatch(setOnePost(data.data.content));
+    dispatch(setLoading(false));
+    dispatch(setOnePostError(false));
+    dispatch(setOnePostSuccess(true));
+    return data;
+  } catch (error) {
+    console.log("Error fetching upvoted content:", error);
+    dispatch(setOnePostError(true));
+    dispatch(setOnePostSuccess(false));
+    dispatch(setError(error.message));
+    dispatch(setLoading(false));
+    throw error;
+  }
+};
 
 export const getUpvotedContentApi = (contentId) => async (dispatch) => {
   try {

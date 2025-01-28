@@ -39,8 +39,9 @@ import { replyToComment } from "@/store/commentSlice";
 import { deleteReply } from "@/store/commentSlice";
 import { upvoteComment } from "@/store/commentSlice";
 import { Alert, AlertDescription } from "./UI/Alerts";
+import { Link } from "react-router-dom";
 
-const CommentModal = ({ isOpen, onClose, userName, postId, onUpvote }) => {
+const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
   const dispatch = useDispatch();
   const [newComment, setNewComment] = useState("");
   const [replyStates, setReplyStates] = useState({});
@@ -380,17 +381,20 @@ const CommentModal = ({ isOpen, onClose, userName, postId, onUpvote }) => {
               <header className="border-b p-5 flex items-center sticky top-0 bg-white/95 backdrop-blur-md z-10 shadow-sm">
                 <Avatar className="w-12 h-12 mr-4 ring-2 ring-blue-100 transition-transform duration-200 hover:scale-105">
                   <AvatarImage
-                    src={post.user?.avatar || "/api/placeholder/40/40"}
+                    src={post.user?.profilePicture || "/api/placeholder/40/40"}
                     alt={userName}
                   />
+
                   <AvatarFallback className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                     {userName?.[0]?.toUpperCase() || "A"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span className="font-bold text-gray-900 hover:text-blue-600 cursor-pointer transition-colors duration-200">
-                    {userName}
-                  </span>
+                  <Link to={`/user/${id}`}>
+                    <span className="font-bold text-gray-900 hover:text-blue-600 cursor-pointer transition-colors duration-200">
+                      {userName}
+                    </span>
+                  </Link>
                   <span className="text-sm text-gray-500">
                     {formatDistanceToNow(new Date(post.createdAt), {
                       addSuffix: true,
@@ -426,6 +430,13 @@ const CommentModal = ({ isOpen, onClose, userName, postId, onUpvote }) => {
                       >
                         <div className="flex items-start space-x-3">
                           <Avatar className="w-9 h-9 ring-2 ring-blue-50">
+                            <AvatarImage
+                              src={
+                                comment.userId?.profilePicture ||
+                                "/api/placeholder/40/40"
+                              }
+                              alt={"userPicture"}
+                            />
                             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
                               {comment.userId?.name?.[0]?.toUpperCase() || "A"}
                             </AvatarFallback>
@@ -433,9 +444,11 @@ const CommentModal = ({ isOpen, onClose, userName, postId, onUpvote }) => {
                           <div className="flex-1">
                             <div className="bg-gray-50 rounded-2xl px-4 py-3 shadow-sm relative group">
                               <p className="mb-1 pr-8">
-                                <span className="font-bold text-gray-900 mr-2 hover:text-blue-600 cursor-pointer transition-colors">
-                                  {comment.userId?.name}
-                                </span>
+                                <Link to={`/user/${comment.userId._id}`}>
+                                  <span className="font-bold text-gray-900 mr-2 hover:text-blue-600 cursor-pointer transition-colors">
+                                    {comment.userId?.name}
+                                  </span>
+                                </Link>
                                 <span className="text-gray-800">
                                   {comment.comment}
                                 </span>
@@ -536,6 +549,13 @@ const CommentModal = ({ isOpen, onClose, userName, postId, onUpvote }) => {
                                       className="ml-8 flex items-start space-x-3 group/reply transform transition-all duration-200 hover:translate-x-1"
                                     >
                                       <Avatar className="w-6 h-6 ring-1 ring-blue-100">
+                                        <AvatarImage
+                                          src={
+                                            reply.userId?.profilePicture ||
+                                            "/api/placeholder/40/40"
+                                          }
+                                          alt={"userPicture"}
+                                        />
                                         <AvatarFallback className="bg-gradient-to-br from-purple-500 to-purple-600 text-white text-xs">
                                           {reply.userId?.name?.[0]?.toUpperCase() ||
                                             "A"}
@@ -544,9 +564,13 @@ const CommentModal = ({ isOpen, onClose, userName, postId, onUpvote }) => {
                                       <div className="flex-1">
                                         <div className="bg-gray-50 rounded-2xl px-3 py-2 shadow-sm relative group">
                                           <p className="mb-1 pr-8">
-                                            <span className="font-bold text-gray-900 mr-2 text-sm hover:text-blue-600 transition-colors duration-200">
-                                              {reply.userId?.name}
-                                            </span>
+                                            <Link
+                                              to={`/user/${reply.userId._id}`}
+                                            >
+                                              <span className="font-bold text-gray-900 mr-2 text-sm hover:text-blue-600 transition-colors duration-200">
+                                                {reply.userId?.name}
+                                              </span>
+                                            </Link>
                                             <span className="text-gray-800 text-sm">
                                               {reply.reply}
                                             </span>

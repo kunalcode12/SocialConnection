@@ -24,7 +24,7 @@ exports.createComment = catchAsync(async (req, res, next) => {
   // Populate user details
   createComment = await createComment.populate({
     path: 'userId',
-    select: 'name email',
+    select: 'name email profilePicture',
   });
 
   // Update comment count in Content
@@ -48,12 +48,13 @@ exports.getAllComments = catchAsync(async (req, res, next) => {
     .sort('-createdAt')
     .populate({
       path: 'userId',
-      select: 'name email',
+      select: '+name +email +profilePicture +_id',
     })
     .populate({
       path: 'replies.userId',
-      select: 'name email',
+      select: '+name +email +profilePicture +_id',
     });
+
   res.status(201).json({
     status: 'success',
     data: {
@@ -61,6 +62,70 @@ exports.getAllComments = catchAsync(async (req, res, next) => {
     },
   });
 });
+// exports.getAllComments = catchAsync(async (req, res, next) => {
+//   if (!req.params.contentId) {
+//     next(new AppError('No comment found on this content id', 404));
+//   }
+
+//   const contents = await Comment.find({ contentId: req.params.contentId })
+//     .sort('-createdAt')
+//     .populate({
+//       path: 'userId',
+//       select: 'name email profilePicture role active',
+//       options: { lean: true },
+//     })
+//     .populate({
+//       path: 'replies.userId',
+//       select: 'name email profilePicture role active',
+//       options: { lean: true },
+//     })
+//     .lean(); // Add this to get plain JavaScript objects
+
+//   // Manual transformation to ensure profilePicture is included
+//   const transformedContents = contents.map((content) => {
+//     if (content.userId) {
+//       content.userId = {
+//         _id: content.userId._id,
+//         name: content.userId.name,
+//         email: content.userId.email,
+//         profilePicture: content.userId.profilePicture || null,
+//         role: content.userId.role,
+//         active: content.userId.active,
+//       };
+//     }
+
+//     if (content.replies) {
+//       content.replies = content.replies.map((reply) => {
+//         if (reply.userId) {
+//           reply.userId = {
+//             _id: reply.userId._id,
+//             name: reply.userId.name,
+//             email: reply.userId.email,
+//             profilePicture: reply.userId.profilePicture || null,
+//             role: reply.userId.role,
+//             active: reply.userId.active,
+//           };
+//         }
+//         return reply;
+//       });
+//     }
+
+//     return content;
+//   });
+
+//   // Add a console.log to verify the transformed data
+//   console.log(
+//     'Transformed first user:',
+//     JSON.stringify(transformedContents[0]?.userId, null, 2)
+//   );
+
+//   res.status(201).json({
+//     status: 'success',
+//     data: {
+//       data: transformedContents,
+//     },
+//   });
+// });
 
 exports.addReplyToComment = catchAsync(async (req, res, next) => {
   if (!req.params.commentId) {
@@ -81,7 +146,7 @@ exports.addReplyToComment = catchAsync(async (req, res, next) => {
       $push: { replies: replyData },
     },
     { new: true }
-  ).populate({ path: 'replies.userId', select: 'name email' });
+  ).populate({ path: 'replies.userId', select: 'name email profilePicture' });
   res.status(201).json({
     status: 'success',
     data: {

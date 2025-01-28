@@ -10,6 +10,7 @@ import ErrorPage from "./pages/ErrorPage";
 import UserPage from "./pages/UserPage";
 import EditPage from "./pages/EditPage";
 import UserProfile from "./pages/UserProfilePage";
+import PostDetailPage from "./pages/PostDetailPage";
 
 const router = createBrowserRouter([
   {
@@ -32,6 +33,10 @@ const router = createBrowserRouter([
         path: "/newest",
         element: <HomePage />,
         loader: NewestPostLoader,
+      },
+      {
+        path: "/content/:contentId",
+        element: <PostDetailPage />,
       },
       { path: "/community", element: <CommunityPage /> },
       { path: "/create", element: <Submit /> },

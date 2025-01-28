@@ -220,6 +220,26 @@ exports.trendingContent = catchAsync(async (req, res, next) => {
   next();
 });
 
+exports.getContent = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+
+  const content = await Content.findById(id).populate({
+    path: 'user',
+    select: 'name email profilePicture',
+  });
+
+  if (!content) {
+    return next(new appError('No content found with that ID', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      content,
+    },
+  });
+});
+
 exports.contentCategory = catchAsync(async (req, res, next) => {
   const content = await Content.find()
     .where('category')

@@ -31,6 +31,7 @@ export const commentSlice = createSlice({
                   _id: comment.userId._id,
                   name: comment.userId.name,
                   email: comment.userId.email,
+                  profilePicture: comment.userId.profilePicture,
                 },
                 // Replace comment text with "Comment deleted" if isDeleted is true
                 comment: comment.isDeleted
@@ -43,6 +44,7 @@ export const commentSlice = createSlice({
                     name: reply.userId.name,
                     email: reply.userId.email,
                     id: reply.userId.id,
+                    profilePicture: reply.userId.profilePicture,
                   },
                 })),
               }),
@@ -122,6 +124,7 @@ export const commentSlice = createSlice({
               name: reply.userId.name,
               email: reply.userId.email,
               id: reply.userId.id,
+              profilePicture: reply.userId.profilePicture,
             },
           });
         }
