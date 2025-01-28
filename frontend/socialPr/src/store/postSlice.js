@@ -1,5 +1,4 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { act } from "react";
 
 const initialPostState = {
   posts: [],
@@ -13,7 +12,7 @@ const initialPostState = {
   upvotingLoading: false,
   upvotingError: false,
   upvotingSuccess: false,
-  bookMarkedPost: null,
+  bookMarkedPost: [],
   loading: false,
   postDeleteSuccess: false,
   updatePostLoading: false,
@@ -79,35 +78,6 @@ export const postSlice = createSlice({
     setUpvotingSuccess: (state, action) => {
       state.upvotingSuccess = action.payload;
     },
-
-    // updatePostUpvote: (state, action) => {
-    //   const postId = action.payload;
-    //   const isUpvoted = state.upvotedContent.includes(postId);
-
-    //   if (isUpvoted) {
-    //     state.upvotedContent = state.upvotedContent.filter(
-    //       (id) => id !== postId
-    //     );
-    //   } else {
-    //     state.upvotedContent.push(postId);
-    //   }
-
-    //   const updateVoteCount = (post) => {
-    //     if (post) {
-    //       if (isUpvoted) {
-    //         post.upVote = Math.max(0, post.upVote - 1);
-    //       } else {
-    //         post.upVote += 1;
-    //       }
-    //     }
-    //   };
-
-    //   const mainPost = state.posts.find((p) => p._id === postId);
-    //   const recentPost = state.recentPost.find((p) => p._id === postId);
-
-    //   updateVoteCount(mainPost);
-    //   updateVoteCount(recentPost);
-    // },
 
     updatePostUpvote: (state, action) => {
       const postId = action.payload;
@@ -518,7 +488,7 @@ export const updatePostApi =
 
 export const savePostApi = (postID) => async (dispatch) => {
   try {
-    dispatch(setLoading(true));
+    // dispatch(setLoading(true));
     const response = await fetch(
       `http://127.0.0.1:3000/api/v1/users/bookmark/${postID}`,
       {
@@ -534,7 +504,7 @@ export const savePostApi = (postID) => async (dispatch) => {
 
     if (!response.ok) throw new Error(data.message || "Login failed");
 
-    dispatch(setLoading(false));
+    // dispatch(setLoading(false));
     dispatch(setSavingError(false));
     dispatch(setSavingSuccess(true));
     return data;

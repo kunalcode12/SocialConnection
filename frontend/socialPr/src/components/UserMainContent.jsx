@@ -3,31 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "./UI/CardComp";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./UI/Tabs";
 import UserPost from "./UserPost";
 import { useDispatch, useSelector } from "react-redux";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect } from "react";
 import {
   setBookMarkedPost,
   setPosts,
   upvoteContentApi,
 } from "@/store/postSlice";
-import SavedContent from "./SavedContent";
-
 import { useParams } from "react-router-dom";
 
 export default function UserMainContent() {
   const { userId } = useParams();
   const dispatch = useDispatch();
 
-  // const [currentPage, setCurrentPage] = useState(1);
   const { user, profileUser, loading, error } = useSelector(
     (state) => state.auth
   );
 
   const isLoggedInUserProfile = user?._id === profileUser?.userData.Id;
   const renderData = profileUser;
-
-  // useEffect(() => {
-  //   dispatch(fetchUserData(userId, currentPage));
-  // }, [userId, currentPage, dispatch]);
 
   const handleUpvote = useCallback(
     (postId) => {
@@ -49,11 +42,6 @@ export default function UserMainContent() {
   const selectPostState = (state) => state.post;
   const { posts, bookMarkedPost } = useSelector(selectPostState);
 
-  // const handlePageChange = (newPage) => {
-  //   // dispatch(fetchUserData(userId, newPage));
-  //   setCurrentPage(newPage);
-  // };
-
   useEffect(() => {
     if (
       profileUser?.bookmarkedContents &&
@@ -63,14 +51,28 @@ export default function UserMainContent() {
     }
   }, [profileUser?.bookmarkedContents, dispatch]);
 
-  const memoizedSavedContent = useMemo(
-    () => (
-      <SavedContent
-        bookmarkedCont={profileUser?.bookmarkedContents}
-        bookMarkedPost={bookMarkedPost}
-      />
-    ),
-    [profileUser?.bookmarkedContents, bookMarkedPost]
+  const renderUserPost = useCallback(
+    (post, isBookmarkedPost = false) => {
+      const postUserId = isBookmarkedPost
+        ? post.user._id
+        : renderData?.userData.Id;
+      const postUserName = isBookmarkedPost
+        ? post.user.name
+        : renderData?.userData.name;
+
+      return (
+        <UserPost
+          key={post?._id}
+          post={post}
+          id={postUserId}
+          name={postUserName}
+          isbookMarkedPost={isBookmarkedPost}
+          onUpvote={handleUpvote}
+          currentUser={user}
+        />
+      );
+    },
+    [renderData?.userData, user, handleUpvote]
   );
 
   return (
@@ -90,16 +92,7 @@ export default function UserMainContent() {
 
           <TabsContent value="overview" className="space-y-4">
             {renderData?.contents && renderData.contents.length > 0 ? (
-              posts.map((post) => (
-                <UserPost
-                  key={post?._id}
-                  post={post}
-                  id={renderData?.userData.Id}
-                  name={renderData.userData.name}
-                  onUpvote={handleUpvote}
-                  currentUser={user}
-                />
-              ))
+              posts.map((post) => renderUserPost(post))
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-gray-500">No posts yet</p>
@@ -107,15 +100,17 @@ export default function UserMainContent() {
             )}
           </TabsContent>
 
-          <TabsContent value="saved">{memoizedSavedContent}</TabsContent>
+          <TabsContent value="saved" className="space-y-4">
+            {profileUser?.bookmarkedContents &&
+            profileUser.bookmarkedContents.length > 0 ? (
+              bookMarkedPost.map((post) => renderUserPost(post, true))
+            ) : (
+              <Card className="p-8 text-center">
+                <p className="text-gray-500">No saved content</p>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
-        {/* {pagination && (
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            onPageChange={handlePageChange}
-          />
-        )} */}
       </div>
 
       <div className="md:w-1/3 space-y-6">

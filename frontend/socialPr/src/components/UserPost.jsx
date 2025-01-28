@@ -78,18 +78,21 @@ const UserPost = memo(
     const dispatch = useDispatch();
 
     const { user, isAuthenticated, token } = useSelector((state) => state.auth);
-    const { loading, upvotedContent } = useSelector((state) => state.post);
+    const { loading, upvotedContent, bookMarkedPost } = useSelector(
+      (state) => state.post
+    );
+    console.log(bookMarkedPost);
 
     const sameUserPost = id === user?._id;
     const isUpvoted = upvotedContent?.includes(post._id);
-    const isBookmarked = user?.bookmarkedCont?.some(
-      (bookmark) => bookmark.content._id === post._id
+    const isBookmarked = bookMarkedPost?.some(
+      (bookmark) => bookmark?._id === post._id
     );
 
     const formattedDate = formatDistanceToNow(new Date(post.createdAt), {
       addSuffix: true,
     });
-
+    console.log(selectedPost);
     const handleThreeDotClick = useCallback((e) => {
       e.stopPropagation();
       setShowDropdown((prev) => !prev);

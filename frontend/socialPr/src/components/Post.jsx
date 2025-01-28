@@ -32,7 +32,11 @@ import { Avatar, AvatarImage, AvatarFallback } from "./UI/Avatar";
 import { useState, useEffect, useRef, memo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { savePostApi, unsavedPostApi } from "@/store/postSlice";
+import {
+  savePostApi,
+  setBookMarkedPost,
+  unsavedPostApi,
+} from "@/store/postSlice";
 import { Alert, AlertDescription } from "./UI/Alerts";
 import CommentModal from "./CommentModel";
 import { getComments, getUserVotes } from "@/store/commentSlice";
@@ -57,16 +61,18 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const { loading, savingError, upvotedContent } = useSelector(
+  const { loading, savingError, upvotedContent, bookMarkedPost } = useSelector(
     (state) => state.post
   );
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
   const sameUserPost = id === user?._id;
   const isUpvoted = upvotedContent?.includes(post._id);
-  const isBookmarked = user?.bookmarkedCont?.some(
-    (bookmark) => bookmark.content._id === post._id
+  const isBookmarked = bookMarkedPost?.some(
+    (bookmark) => bookmark?._id === post._id
   );
+
+  console.log(bookMarkedPost);
 
   useEffect(() => {
     if (savingError) {
@@ -89,6 +95,7 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
         break;
       case "save":
         dispatch(savePostApi(post._id));
+
         break;
       case "unsave":
         dispatch(unsavedPostApi(post._id));

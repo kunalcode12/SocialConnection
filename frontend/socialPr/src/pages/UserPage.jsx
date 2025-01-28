@@ -380,10 +380,8 @@ export default function UserProfile() {
               <div className="relative">
                 <Avatar className="w-24 h-24 border-4 border-white shadow-xl hover:shadow-2xl transition-shadow">
                   <div
-                    onClick={() =>
-                      isLoggedInUserProfile && setIsProfileImageDialogOpen(true)
-                    }
-                    className={isLoggedInUserProfile ? "cursor-pointer" : ""}
+                    onClick={() => setIsProfileImageDialogOpen(true)}
+                    className={"cursor-pointer"}
                   >
                     {profilePicture ? (
                       <AvatarImage
