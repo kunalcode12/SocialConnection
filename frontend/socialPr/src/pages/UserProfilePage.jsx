@@ -20,9 +20,11 @@ import {
   updateUserProfilePassword,
   deleteUser,
 } from "../store/userUpdateSlice";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { fetchUserData } from "@/store/authSlice";
 
 export default function UserProfile() {
+  const { userId } = useParams();
   const dispatch = useDispatch();
   const user = useSelector(useCallback((state) => state.auth.profileUser, []));
 
@@ -31,8 +33,8 @@ export default function UserProfile() {
 
   const [activeTab, setActiveTab] = useState("profile");
   const [showPassword, setShowPassword] = useState(false);
-  const [name, setName] = useState(user.userData.name);
-  const [email, setEmail] = useState(user.userData.email);
+  const [name, setName] = useState(user?.userData?.name);
+  const [email, setEmail] = useState(user?.userData?.email);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const navigate = useNavigate();

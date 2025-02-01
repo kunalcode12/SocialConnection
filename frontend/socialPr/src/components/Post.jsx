@@ -18,6 +18,8 @@ import {
   Minimize2,
   Maximize2,
   X,
+  Check,
+  Copy,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -30,7 +32,7 @@ import {
 import { Button } from "./UI/Button";
 import { Avatar, AvatarImage, AvatarFallback } from "./UI/Avatar";
 import { useState, useEffect, useRef, memo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import {
   savePostApi,
@@ -41,6 +43,7 @@ import { Alert, AlertDescription } from "./UI/Alerts";
 import CommentModal from "./CommentModel";
 import { getComments, getUserVotes } from "@/store/commentSlice";
 import { Dialog, DialogContent } from "./UI/dialog";
+import ShareDialog from "./ShareDialog";
 
 const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
   const [selectedPost, setSelectedPost] = useState(null);
@@ -52,6 +55,7 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const videoRef = useRef(null);
   const videoModalRef = useRef(null);
@@ -71,8 +75,6 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
   const isBookmarked = bookMarkedPost?.some(
     (bookmark) => bookmark?._id === post._id
   );
-
-  console.log(bookMarkedPost);
 
   useEffect(() => {
     if (savingError) {
@@ -110,11 +112,11 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
   };
 
   const openComments = (post) => {
-    setSelectedPost(post);
     if (user?._id) {
       dispatch(getUserVotes(user._id));
       dispatch(getComments(post._id));
     }
+    setSelectedPost(post);
   };
 
   useEffect(() => {
@@ -393,12 +395,11 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
               <MessageSquare className="h-5 w-5 text-gray-500" />
               <span className="font-medium">{post.commentCount}</span>
             </Button>
-            <Button variant="ghost" className="hover:bg-gray-100 rounded-full">
-              <Award className="h-5 w-5 text-gray-500" />
-            </Button>
+
             <Button
               variant="ghost"
               className="hover:bg-gray-100 rounded-full space-x-2"
+              onClick={() => setShareModalOpen(true)}
             >
               <Share2 className="h-5 w-5 text-gray-500" />
               <span className="font-medium">Share</span>
@@ -499,6 +500,12 @@ const Post = memo(function Post({ post, id, name, onUpvote, currentUser }) {
           </DialogContent>
         </Dialog>
       )}
+      <ShareDialog
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        url={`${window.location.origin}/content/${post._id}`}
+        message="Share this post"
+      />
 
       <CommentModal
         postId={selectedPost?._id}

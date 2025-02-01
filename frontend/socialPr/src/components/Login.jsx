@@ -20,7 +20,7 @@ function LoginPopup({ isOpen, setIsOpen }) {
   }, [dispatch]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isAuthenticated) {
       setIsOpen(false);
       navigate("/");
     }

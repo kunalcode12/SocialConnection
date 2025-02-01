@@ -11,6 +11,10 @@ import UserPage from "./pages/UserPage";
 import EditPage from "./pages/EditPage";
 import UserProfile from "./pages/UserProfilePage";
 import PostDetailPage from "./pages/PostDetailPage";
+import Chat from "./chat/index";
+import Profile from "./chat/Profile";
+import ChatLayout from "./pages/ChatLayout";
+import ProtectedRoute from "./components/ProtectRoute";
 
 const router = createBrowserRouter([
   {
@@ -42,7 +46,6 @@ const router = createBrowserRouter([
       { path: "/create", element: <Submit /> },
       {
         path: "/user/:userId",
-
         children: [
           {
             index: true,
@@ -57,6 +60,24 @@ const router = createBrowserRouter([
             element: <UserProfile />,
           },
         ],
+      },
+    ],
+  },
+  {
+    path: "/chat",
+    element: (
+      <ProtectedRoute>
+        <ChatLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Chat />,
+      },
+      {
+        path: "profile",
+        element: <Profile />,
       },
     ],
   },

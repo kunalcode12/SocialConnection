@@ -20,7 +20,7 @@ function Header() {
   const navigate = useNavigate();
 
   const dispatch = useDispatch();
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
 
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSignupOpen, setIsSignupOpen] = useState(false);
@@ -134,14 +134,15 @@ function Header() {
           <div className="flex items-center space-x-3">
             {isAuthenticated ? (
               <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative hover:bg-gray-100 transition-colors duration-200"
-                >
-                  <MessageCircle className="h-5 w-5 text-gray-700" />
-                </Button>
-
+                <Link to={"/chat"}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative hover:bg-gray-100 transition-colors duration-200"
+                  >
+                    <MessageCircle className="h-5 w-5 text-gray-700" />
+                  </Button>
+                </Link>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -218,19 +219,24 @@ function Header() {
           setIsOpen={useCallback(
             (open) => {
               setIsLoginOpen(open);
-              if (!open) navigate("/");
+              if (!open && searchParams.get("mode")) {
+                navigate("/");
+              }
             },
-            [navigate]
+            [navigate, searchParams]
           )}
         />
+
         <SignupPopup
           isOpen={isSignupOpen}
           setIsOpen={useCallback(
             (open) => {
               setIsSignupOpen(open);
-              if (!open) navigate("/");
+              if (!open && searchParams.get("mode")) {
+                navigate("/");
+              }
             },
-            [navigate]
+            [navigate, searchParams]
           )}
         />
       </header>

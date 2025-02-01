@@ -40,6 +40,7 @@ import { deleteReply } from "@/store/commentSlice";
 import { upvoteComment } from "@/store/commentSlice";
 import { Alert, AlertDescription } from "./UI/Alerts";
 import { Link } from "react-router-dom";
+import ShareDialog from "./ShareDialog";
 
 const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
   const dispatch = useDispatch();
@@ -53,12 +54,14 @@ const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
     success,
     errorMessage,
     successMessage,
-    userVotes,
+    commentVotes,
+    replyVotes,
     upvoteLoading,
   } = useSelector((state) => state.comments);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(true);
   const [videoProgress, setVideoProgress] = useState(0);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const videoRef = useRef(null);
   const progressRef = useRef(null);
@@ -171,7 +174,7 @@ const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
 
   const hasUserUpvotedComment = (commentId) => {
     return (
-      userVotes?.commentVotes?.some(
+      commentVotes?.some(
         (vote) =>
           vote.commentId === commentId &&
           vote.userId === user?._id &&
@@ -183,7 +186,7 @@ const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
   // Function to check if user has upvoted a reply
   const hasUserUpvotedReply = (replyId) => {
     return (
-      userVotes?.replyVotes?.some(
+      replyVotes?.some(
         (vote) =>
           vote.replyId === replyId &&
           vote.userId === user?._id &&
@@ -249,29 +252,10 @@ const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
     }
   };
 
-  // const handleUpvote = (e) => {
-  //   e.preventDefault();
-  //   if (user) {
-  //     dispatch(upvoteComment(post._id));
-  //   }
-  // };
-
   const handleUpvote = (e) => {
     e.preventDefault();
     if (user) onUpvote(post._id);
   };
-
-  const handleShare = () => {
-    // Implement share functionality
-    console.log("Sharing post:", post._id);
-  };
-
-  // const isUpvoted = userVotes?.commentVotes?.some(
-  //   (vote) =>
-  //     vote.commentId === post._id &&
-  //     vote.userId === user?._id &&
-  //     vote.voteType === "upvote"
-  // );
 
   if (!post) return null;
 
@@ -678,7 +662,7 @@ const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
                   <Button
                     variant="ghost"
                     className="hover:bg-gray-100 rounded-full space-x-2"
-                    onClick={handleShare}
+                    onClick={() => setShareModalOpen(true)}
                   >
                     <Share2 className="h-5 w-5 text-gray-500" />
                     <span className="font-medium">Share</span>
@@ -716,6 +700,12 @@ const CommentModal = ({ isOpen, onClose, userName, postId, id, onUpvote }) => {
           </div>
         </DialogContent>
       </DialogPortal>
+      <ShareDialog
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        url={`${window.location.origin}/content/${post._id}`}
+        message="Share this post"
+      />
     </Dialog>
   );
 };

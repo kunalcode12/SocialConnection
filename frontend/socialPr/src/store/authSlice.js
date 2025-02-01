@@ -151,6 +151,53 @@ export const signup = (userData) => async (dispatch) => {
   }
 };
 
+// export const initializeAuthAsync = () => async (dispatch, getState) => {
+//   const { initialized, token } = getState().auth;
+
+//   if (initialized) return;
+
+//   dispatch(setInitialized(true));
+
+//   if (!token) {
+//     const storedToken = localStorage.getItem("token");
+//     if (!storedToken) {
+//       dispatch(logout());
+//       return;
+//     }
+//   }
+
+//   try {
+//     dispatch(setLoading(true));
+//     const response = await fetch("http://127.0.0.1:3000/api/v1/users/me", {
+//       headers: {
+//         Authorization: `Bearer ${token || localStorage.getItem("token")}`,
+//       },
+//     });
+//     const userData = await response.json();
+
+//     if (!response.ok)
+//       throw new Error(userData.message || "Failed to fetch user data");
+
+//     //console.log(`Initialize (/me) one :`, userData.data.data.active);
+
+//     if (!userData?.data?.data?.active) {
+//       throw new Error("Account is inactive");
+//     }
+
+//     dispatch(
+//       setCredentials({
+//         user: userData.data.data,
+//         token: token || localStorage.getItem("token"),
+//       })
+//     );
+//   } catch (error) {
+//     console.error("Error fetching user data:", error);
+//     dispatch(logout());
+//   } finally {
+//     dispatch(setLoading(false));
+//   }
+// };
+
 export const initializeAuthAsync = () => async (dispatch, getState) => {
   const { initialized, token } = getState().auth;
 
@@ -177,8 +224,6 @@ export const initializeAuthAsync = () => async (dispatch, getState) => {
 
     if (!response.ok)
       throw new Error(userData.message || "Failed to fetch user data");
-
-    //console.log(`Initialize (/me) one :`, userData.data.data.active);
 
     if (!userData?.data?.data?.active) {
       throw new Error("Account is inactive");

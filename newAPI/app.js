@@ -11,6 +11,7 @@ const searchRoutes = require('./routes/searchRoutes');
 const AppError = require('./utils/appError');
 const app = express();
 const globalErrorHandler = require('./controllers/errorController');
+const cookieParser = require('cookie-parser');
 
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
@@ -18,6 +19,7 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use(cors());
 
+app.use(cookieParser());
 app.use(express.json());
 
 app.use('/api/v1/users', userRouter);

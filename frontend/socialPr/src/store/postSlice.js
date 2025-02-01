@@ -254,7 +254,6 @@ export const getAllContentApi =
     try {
       const { limit = 10, pathname = "/", categories = null } = options;
 
-      // Determine sort parameter based on pathname
       let sortParam = "";
       switch (pathname) {
         case "/popular":
@@ -264,19 +263,16 @@ export const getAllContentApi =
           sortParam = "-createdAt";
           break;
         default:
-          sortParam = ""; // Default sorting
+          sortParam = "";
       }
 
-      // Construct query parameters
       const queryParams = new URLSearchParams({
         sort: sortParam,
         limit: limit.toString(),
         page: page.toString(),
       });
 
-      // Add categories if provided
       if (categories) {
-        // Convert categories to comma-separated string if it's an array
         const categoriesParam = Array.isArray(categories)
           ? categories.join(",")
           : categories;
@@ -284,10 +280,8 @@ export const getAllContentApi =
         queryParams.append("categories", categoriesParam);
       }
 
-      // Construct full URL
       const url = `http://127.0.0.1:3000/api/v1/content?${queryParams.toString()}`;
 
-      // Fetch content
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -505,6 +499,7 @@ export const savePostApi = (postID) => async (dispatch) => {
     if (!response.ok) throw new Error(data.message || "Login failed");
 
     // dispatch(setLoading(false));
+    dispatch(setBookMarkedPost(data.data.bookmarks));
     dispatch(setSavingError(false));
     dispatch(setSavingSuccess(true));
     return data;

@@ -54,6 +54,7 @@ import { formatDistanceToNow } from "date-fns";
 import CommentModal from "./CommentModel";
 import { getComments, getUserVotes } from "@/store/commentSlice";
 import { mediaService } from "@/services/mediaService";
+import ShareDialog from "./ShareDialog";
 
 const UserPost = memo(
   ({ post, id, name, className, onUpvote, currentUser }) => {
@@ -66,6 +67,7 @@ const UserPost = memo(
     const [videoProgress, setVideoProgress] = useState(0);
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
+    const [shareModalOpen, setShareModalOpen] = useState(false);
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -81,13 +83,13 @@ const UserPost = memo(
     const { loading, upvotedContent, bookMarkedPost } = useSelector(
       (state) => state.post
     );
-    console.log(bookMarkedPost);
 
     const sameUserPost = id === user?._id;
     const isUpvoted = upvotedContent?.includes(post._id);
     const isBookmarked = bookMarkedPost?.some(
       (bookmark) => bookmark?._id === post._id
     );
+    console.log(bookMarkedPost);
 
     const formattedDate = formatDistanceToNow(new Date(post.createdAt), {
       addSuffix: true,
@@ -97,17 +99,6 @@ const UserPost = memo(
       e.stopPropagation();
       setShowDropdown((prev) => !prev);
     }, []);
-
-    // const handleUpvote = useCallback(
-    //   (postId) => {
-    //     try {
-    //       dispatch(upvoteContentApi(postId));
-    //     } catch (error) {
-    //       console.error("Upvote failed:", error);
-    //     }
-    //   },
-    //   [dispatch]
-    // );
 
     const { isError, postDeleteSuccess } = useSelector((state) => state.post);
 
@@ -142,7 +133,6 @@ const UserPost = memo(
     const handleDeleteConfirm = useCallback(async () => {
       try {
         const result = await mediaService.deleteMedia(post.mediaId);
-        console.log(result);
 
         // For 204 No Content responses, you might need to adjust the condition
         if (result.success || result.status === "success") {
@@ -485,15 +475,11 @@ const UserPost = memo(
                 <MessageSquare className="h-5 w-5 text-gray-500" />
                 <span className="font-medium">{post.commentCount}</span>
               </Button>
-              <Button
-                variant="ghost"
-                className="hover:bg-gray-100 rounded-full"
-              >
-                <Award className="h-5 w-5 text-gray-500" />
-              </Button>
+
               <Button
                 variant="ghost"
                 className="hover:bg-gray-100 rounded-full space-x-2"
+                onClick={() => setShareModalOpen(true)}
               >
                 <Share2 className="h-5 w-5 text-gray-500" />
                 <span className="font-medium">Share</span>
@@ -620,6 +606,13 @@ const UserPost = memo(
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <ShareDialog
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          url={`${window.location.origin}/content/${post._id}`}
+          message="Share this post"
+        />
 
         {/* Comment Modal */}
         <CommentModal

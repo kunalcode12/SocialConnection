@@ -1,12 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Check, ChevronDown, User, FileText, Search, X } from "lucide-react";
 import { Input } from "./UI/Input";
 import { Button } from "./UI/Button";
 import { Avatar, AvatarFallback, AvatarImage } from "./UI/Avatar";
 import debounce from "lodash/debounce";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { getComments, getUserVotes } from "@/store/commentSlice";
+import { Link, useLocation } from "react-router-dom";
 
 const SearchComponent = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,10 +20,6 @@ const SearchComponent = () => {
   const searchContainerRef = useRef(null);
   const inputRef = useRef(null);
   const location = useLocation();
-
-  const user = useSelector((state) => state.auth.user);
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
 
   useEffect(() => {
     resetSearch();

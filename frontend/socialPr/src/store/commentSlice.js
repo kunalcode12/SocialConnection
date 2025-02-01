@@ -9,10 +9,9 @@ const initialCommentState = {
   errorMessage: "",
   successMessage: "",
   upvoteLoading: false,
-  userVotes: {
-    commentVotes: [],
-    replyVotes: [],
-  },
+
+  commentVotes: [],
+  replyVotes: [],
 };
 
 export const commentSlice = createSlice({
@@ -53,18 +52,21 @@ export const commentSlice = createSlice({
     },
 
     setUserVotes: (state, action) => {
-      state.userVotes = {
-        commentVotes: action.payload.commentVotes.map((vote) => ({
-          commentId: vote.commentId._id,
+      // Handle comment votes - ensure commentId is properly extracted
+      state.commentVotes = action.payload.commentVotes
+        .map((vote) => ({
+          commentId: vote.commentId?._id || vote.commentId, // Handle both nested and direct ID cases
           voteType: vote.voteType,
           userId: vote.userId,
-        })),
-        replyVotes: action.payload.replyVotes.map((vote) => ({
-          replyId: vote.replyId,
-          voteType: vote.voteType,
-          userId: vote.userId,
-        })),
-      };
+        }))
+        .filter((vote) => vote.commentId !== null); // Filter out any votes with null commentId
+
+      // Handle reply votes
+      state.replyVotes = action.payload.replyVotes.map((vote) => ({
+        replyId: vote.replyId,
+        voteType: vote.voteType,
+        userId: vote.userId,
+      }));
     },
 
     addComment: (state, action) => {
@@ -94,7 +96,7 @@ export const commentSlice = createSlice({
         }
 
         // Remove associated votes when comment is deleted
-        state.userVotes.commentVotes = state.userVotes.commentVotes.filter(
+        state.commentVotes = state.commentVotes.filter(
           (vote) => vote.commentId !== action.payload
         );
       }
@@ -141,7 +143,7 @@ export const commentSlice = createSlice({
         );
 
         // Remove associated votes when reply is deleted
-        state.userVotes.replyVotes = state.userVotes.replyVotes.filter(
+        state.replyVotes = state.replyVotes.filter(
           (vote) => vote.replyId !== replyId
         );
 
@@ -161,24 +163,24 @@ export const commentSlice = createSlice({
         if (action.payload.message === "upvote removed successfull") {
           comment.upVote = Math.max(0, (comment.upVote || 0) - 1);
           // Remove vote from userVotes
-          state.userVotes.commentVotes = state.userVotes.commentVotes.filter(
+          state.commentVotes = state.commentVotes.filter(
             (vote) => vote.commentId !== commentId
           );
         } else {
           comment.upVote = (comment.upVote || 0) + 1;
           // Add or update vote in userVotes
-          const existingVoteIndex = state.userVotes.commentVotes.findIndex(
+          const existingVoteIndex = state.commentVotes.findIndex(
             (vote) => vote.commentId === commentId
           );
 
           if (existingVoteIndex >= 0) {
-            state.userVotes.commentVotes[existingVoteIndex] = {
+            state.commentVotes[existingVoteIndex] = {
               commentId,
               voteType,
               userId,
             };
           } else {
-            state.userVotes.commentVotes.push({
+            state.commentVotes.push({
               commentId,
               voteType,
               userId,
@@ -199,24 +201,24 @@ export const commentSlice = createSlice({
           if (action.payload.message === "upvote removed successfully") {
             reply.upVoteReply = Math.max(0, (reply.upVoteReply || 0) - 1);
             // Remove vote from userVotes
-            state.userVotes.replyVotes = state.userVotes.replyVotes.filter(
+            state.replyVotes = state.replyVotes.filter(
               (vote) => vote.replyId !== replyId
             );
           } else {
             reply.upVoteReply = (reply.upVoteReply || 0) + 1;
             // Add or update vote in userVotes
-            const existingVoteIndex = state.userVotes.replyVotes.findIndex(
+            const existingVoteIndex = state.replyVotes.findIndex(
               (vote) => vote.replyId === replyId
             );
 
             if (existingVoteIndex >= 0) {
-              state.userVotes.replyVotes[existingVoteIndex] = {
+              state.replyVotes[existingVoteIndex] = {
                 replyId,
                 voteType,
                 userId,
               };
             } else {
-              state.userVotes.replyVotes.push({
+              state.replyVotes.push({
                 replyId,
                 voteType,
                 userId,
@@ -513,6 +515,7 @@ export const getUserVotes = (userId) => async (dispatch) => {
     if (!response.ok) {
       throw new Error(data.message || "Failed to fetch user votes");
     }
+    console.log(data.data);
 
     dispatch(setUserVotes(data.data));
     dispatch(setLoading(false));
