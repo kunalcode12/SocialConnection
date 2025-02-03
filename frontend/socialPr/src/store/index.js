@@ -4,6 +4,7 @@ import { postSlice } from "./postSlice";
 import { commentSlice } from "./commentSlice";
 import { userUpdateSlice } from "./userUpdateSlice";
 import { followSlice } from "./followSlice";
+import { chatSlice } from "./chatSlice";
 
 const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ const store = configureStore({
     userUpdate: userUpdateSlice.reducer,
     comments: commentSlice.reducer,
     follow: followSlice.reducer,
+    chat: chatSlice.reducer,
   },
 });
 

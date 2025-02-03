@@ -17,6 +17,7 @@ router.patch('/resetPassword/:token', authController.resetPassword);
 router.use(authController.protect);
 
 router.patch('/updateMyPassword', authController.updatePassword);
+router.route('/get-contacts-for-dm').get(userController.getContactForDMList);
 
 router
   .route('/profilePicture')

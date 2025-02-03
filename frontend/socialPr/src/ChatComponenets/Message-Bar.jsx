@@ -1,11 +1,18 @@
+import { useSocket } from "@/context/socketContext";
 import EmojiPicker from "emoji-picker-react";
 import { Paperclip, SendHorizonal, SmilePlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 
 function MessageBar() {
   const emojiRef = useRef();
   const [Message, setMessage] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const { user } = useSelector((state) => state.auth);
+  const { selectedChatType, selectedChatData } = useSelector(
+    (state) => state.chat
+  );
+  const socket = useSocket();
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -23,7 +30,53 @@ function MessageBar() {
     setMessage((msg) => msg + emoji.emoji);
   };
 
-  const handleSendMessage = async () => {};
+  // console.log(user._id);
+  // console.log(selectedChatData.userId);
+  // console.log(Message);
+  // const handleSendMessage = async () => {
+  //   if (selectedChatType === "contact") {
+  //     console.log(selectedChatType);
+  //     try {
+  //       socket.emit("sendMessage", {
+  //         senders: user._id,
+  //         content: Message,
+  //         recipient: selectedChatData.userId,
+  //         messageType: "text",
+  //         fileUrl: undefined,
+  //       });
+  //     } catch (error) {
+  //       console.log(error);
+  //     }
+  //   }
+  // };
+
+  const handleSendMessage = async () => {
+    if (!Message.trim() || !selectedChatData) {
+      console.log("Cannot send: empty message or no selected chat");
+      return;
+    }
+
+    // if (selectedChatType === "contact") {
+    //   console.log("Sending message:", {
+    //     senders: user._id,
+    //     content: Message,
+    //     recipient: selectedChatData.userId,
+    //   });
+
+    try {
+      if (selectedChatType === "contact") {
+        socket.emit("sendMessage", {
+          senders: user._id,
+          content: Message,
+          recipient: selectedChatData.userId,
+          messageType: "text",
+          fileUrl: undefined,
+        });
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
 
   return (
     <div className="h-[5vh] bg-[#1c1d25] flex justify-center items-center px-8 mb-6 gap-6">

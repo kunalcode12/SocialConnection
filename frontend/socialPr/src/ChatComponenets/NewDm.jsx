@@ -16,6 +16,10 @@ import {
 import { Input } from "@/components/UI/Input";
 import Lottie from "react-lottie";
 import animationData from "@/assets/lottie-json";
+import ScrollArea from "@/components/UI/ScrollArea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/UI/Avatar";
+import { useDispatch } from "react-redux";
+import { setSelectedChatData, setSelectedChatType } from "@/store/chatSlice";
 
 const animationDefaultOptions = {
   loop: true,
@@ -26,7 +30,34 @@ const animationDefaultOptions = {
 function NewDm() {
   const [openNewContactModal, setOpenNewContactModal] = useState(false);
   const [searchedContact, setSearchedContact] = useState([]);
-  const searchContacts = async (searchTerm) => {};
+
+  const dispatch = useDispatch();
+
+  const searchContacts = async (searchTerm) => {
+    try {
+      if (searchTerm.length > 0) {
+        const response = await fetch(
+          `http://127.0.0.1:3000/api/v1/searching/search/users?query=${searchTerm}`
+        );
+        const data = await response.json();
+
+        if (data.status === "success" && data.data) {
+          setSearchedContact(data.data);
+        }
+      } else {
+        setSearchedContact([]);
+      }
+    } catch (error) {
+      console.log({ error });
+    }
+  };
+
+  const selectNewContact = (contact) => {
+    setOpenNewContactModal(false);
+    dispatch(setSelectedChatType("contact"));
+    dispatch(setSelectedChatData(contact));
+    setSearchedContact([]);
+  };
 
   return (
     <>
@@ -56,8 +87,40 @@ function NewDm() {
               onChange={(e) => searchContacts(e.target.value)}
             />
           </div>
+          {searchedContact.length > 0 && (
+            <ScrollArea className="h-[250px]">
+              <div className="flex flex-col gap-5">
+                {searchedContact.map((contact) => (
+                  <div
+                    className="flex gap-3 items-center cursor-pointer"
+                    key={contact.userId}
+                    onClick={() => selectNewContact(contact)}
+                  >
+                    <div className="w-12 h-12 relative">
+                      <Avatar className="h-12 w-12 rounded-full overflow-hidden">
+                        {contact.profilePicture ? (
+                          <AvatarImage
+                            src={contact?.profilePicture}
+                            className="object-cover w-full h-full bg-purple-600"
+                          />
+                        ) : (
+                          <AvatarFallback className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white font-semibold text-xl flex items-center justify-center">
+                            {contact?.name?.[0]?.toUpperCase() || "?"}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                    </div>
+                    <div className="flex flex-col">
+                      <span>{contact?.name}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+
           {searchedContact.length <= 0 && (
-            <div className="flex-1 md:bg-[#1c1d25] md:flex mt-5 flex-col justify-center items-center hidden duration-1000 transition-all">
+            <div className="flex-1 md:flex mt-5 md:mt-0 flex-col justify-center items-center hidden duration-1000 transition-all">
               <Lottie
                 isClickToPauseDisabled={true}
                 height={100}

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const { cleanupTempUploads } = require('./utils/fileCleanup');
+const setupSocket = require('./socket');
 
 // process.on('uncaughtException', (err) => {
 //   console.log('UNCAUGHT EXCEPTION!!  Shutting down...');
@@ -27,6 +28,8 @@ const server = app.listen(port, () => {
   cleanupTempUploads();
   setInterval(cleanupTempUploads, 12 * 60 * 60 * 1000);
 });
+
+setupSocket(server);
 
 process.on('unhandledRejection', (err) => {
   console.log('UNHANDLED REJECTION!!  Shutting down...');

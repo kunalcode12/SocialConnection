@@ -6,6 +6,8 @@ const uploadService = require('../services/uploadService');
 const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
+const { default: mongoose } = require('mongoose');
+const Message = require('../models/messagesModel');
 
 const filterObj = (obj, ...allowedFields) => {
   const newObj = {};
@@ -519,4 +521,61 @@ exports.deleteProfilePicture = catchAsync(async (req, res, next) => {
     console.error('Profile picture deletion error:', error);
     return next(new AppError('Failed to delete profile picture', 500));
   }
+});
+
+exports.getContactForDMList = catchAsync(async (req, res, next) => {
+  let { userId } = req;
+  userId = new mongoose.Types.ObjectId(userId);
+
+  if (!userId) {
+    next(new AppError('Please provide the user', 404));
+  }
+
+  const contacts = await Message.aggregate([
+    {
+      $match: {
+        $or: [{ senders: userId }, { recipient: userId }],
+      },
+    },
+    {
+      $sort: { timestamp: -1 },
+    },
+    {
+      $group: {
+        _id: {
+          $cound: {
+            if: { $eq: ['$senders', userId] },
+            then: '$recipient',
+            else: '$senders',
+          },
+        },
+        lastMessageTime: { $first: $timestamp },
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'contactInfo',
+      },
+    },
+    {
+      $unwind: 'contactInfo',
+    },
+    {
+      $project: {
+        _id: 1,
+        lastMessageTime: 1,
+        email: '$contactInfo.email',
+        name: '$contactInfo.name',
+        profilePicture: '$contactInfo.profilePicture',
+      },
+    },
+    {
+      $sort: { lastMessageTime: -1 },
+    },
+  ]);
+
+  res.status(200).json({ contacts });
 });

@@ -15,6 +15,7 @@ import Chat from "./chat/index";
 import Profile from "./chat/Profile";
 import ChatLayout from "./pages/ChatLayout";
 import ProtectedRoute from "./components/ProtectRoute";
+import { SocketProvider } from "./context/socketContext";
 
 const router = createBrowserRouter([
   {
@@ -67,7 +68,9 @@ const router = createBrowserRouter([
     path: "/chat",
     element: (
       <ProtectedRoute>
-        <ChatLayout />
+        <SocketProvider>
+          <ChatLayout />
+        </SocketProvider>
       </ProtectedRoute>
     ),
     children: [
