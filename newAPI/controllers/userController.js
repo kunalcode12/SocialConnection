@@ -524,58 +524,63 @@ exports.deleteProfilePicture = catchAsync(async (req, res, next) => {
 });
 
 exports.getContactForDMList = catchAsync(async (req, res, next) => {
-  let { userId } = req;
+  let userId = req.user.id;
   userId = new mongoose.Types.ObjectId(userId);
 
   if (!userId) {
     next(new AppError('Please provide the user', 404));
   }
 
-  const contacts = await Message.aggregate([
-    {
-      $match: {
-        $or: [{ senders: userId }, { recipient: userId }],
-      },
-    },
-    {
-      $sort: { timestamp: -1 },
-    },
-    {
-      $group: {
-        _id: {
-          $cound: {
-            if: { $eq: ['$senders', userId] },
-            then: '$recipient',
-            else: '$senders',
-          },
+  try {
+    const contacts = await Message.aggregate([
+      {
+        $match: {
+          $or: [{ senders: userId }, { recipient: userId }],
         },
-        lastMessageTime: { $first: $timestamp },
       },
-    },
-    {
-      $lookup: {
-        from: 'users',
-        localField: '_id',
-        foreignField: '_id',
-        as: 'contactInfo',
+      {
+        $sort: { timestamp: -1 },
       },
-    },
-    {
-      $unwind: 'contactInfo',
-    },
-    {
-      $project: {
-        _id: 1,
-        lastMessageTime: 1,
-        email: '$contactInfo.email',
-        name: '$contactInfo.name',
-        profilePicture: '$contactInfo.profilePicture',
+      {
+        $group: {
+          _id: {
+            $cond: {
+              if: { $eq: ['$senders', userId] },
+              then: '$recipient',
+              else: '$senders',
+            },
+          },
+          lastMessageTime: { $first: '$timestamp' },
+        },
       },
-    },
-    {
-      $sort: { lastMessageTime: -1 },
-    },
-  ]);
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'contactInfo',
+        },
+      },
+      {
+        $unwind: '$contactInfo',
+      },
+      {
+        $project: {
+          userId: '$_id', // Change _id to userId in the projection
+          _id: 0, // Exclude the original _id
+          lastMessageTime: 1,
+          email: '$contactInfo.email',
+          name: '$contactInfo.name',
+          profilePicture: '$contactInfo.profilePicture',
+        },
+      },
+      {
+        $sort: { lastMessageTime: -1 },
+      },
+    ]);
 
-  res.status(200).json({ contacts });
+    res.status(200).json({ contacts });
+  } catch (error) {
+    console.log('Error in code:', error);
+  }
 });

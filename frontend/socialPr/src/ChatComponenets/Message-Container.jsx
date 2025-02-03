@@ -26,6 +26,7 @@ function MessageContainer() {
         );
 
         const data = await response.json();
+        console.log(data);
 
         if (data.messages) {
           dispatch(setSelectedChatMessage(data.messages));
@@ -34,6 +35,7 @@ function MessageContainer() {
         console.log(error);
       }
     };
+
     if (selectedChatData.userId) {
       if (selectedChatType === "contact") {
         getMessages();
