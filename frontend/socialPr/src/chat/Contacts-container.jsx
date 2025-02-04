@@ -8,7 +8,9 @@ import { useDispatch, useSelector } from "react-redux";
 
 function ContactsContainer() {
   const dispatch = useDispatch();
-  const { directMessagesContacts } = useSelector((state) => state.chat);
+  const { directMessagesContacts, channels } = useSelector(
+    (state) => state.chat
+  );
   useEffect(() => {
     const getContacts = async () => {
       const response = await fetch(
@@ -42,6 +44,9 @@ function ContactsContainer() {
         <div className="flex items-center justify-between pr-10">
           <Title text={"Channels"} />
           <CreateChannel />
+        </div>
+        <div className="max-h-[38vh] overflow-y-auto scrollbar-hidden">
+          <ContactList contacts={channels} isChannel={true} />
         </div>
       </div>
       <ProfileInfo />

@@ -9,6 +9,7 @@ const commentsRouter = require('./routes/commentRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const messageRoutes = require('./routes/messagesRoutes');
+const channelRoutes = require('./routes/channelRoutes');
 const AppError = require('./utils/appError');
 const app = express();
 const globalErrorHandler = require('./controllers/errorController');
@@ -33,6 +34,7 @@ app.use('/api/v1/comment', commentsRouter);
 app.use('/api/v1/media', mediaRoutes);
 app.use('/api/v1/searching', searchRoutes);
 app.use('/api/v1/messages', messageRoutes);
+app.use('/api/v1/channel', channelRoutes);
 
 app.all('*', (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server`, 404));

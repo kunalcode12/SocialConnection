@@ -14,24 +14,18 @@ import {
   DialogTitle,
 } from "@/components/UI/dialog";
 import { Input } from "@/components/UI/Input";
-import Lottie from "react-lottie";
-import animationData from "@/assets/lottie-json";
-import ScrollArea from "@/components/UI/ScrollArea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/UI/Avatar";
+
 import { useDispatch } from "react-redux";
-import { setSelectedChatData, setSelectedChatType } from "@/store/chatSlice";
+import {
+  setSelectedChatData,
+  setSelectedChatType,
+  addChannel,
+} from "@/store/chatSlice";
 import { Button } from "@radix-ui/themes";
 import MultipleSelector from "@/components/UI/MultipleSelect";
 
-const animationDefaultOptions = {
-  loop: true,
-  autoplay: true,
-  animationData: animationData,
-};
-
 function CreateChannel() {
   const [newChannelModel, setNewChannelModel] = useState(false);
-  const [searchedContact, setSearchedContact] = useState([]);
   const [allContacts, setAllContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState([]);
   const [channelName, setChannelName] = useState("");
@@ -62,7 +56,37 @@ function CreateChannel() {
     getData();
   }, []);
 
-  const createChannel = async () => {};
+  const createChannel = async () => {
+    try {
+      if (channelName.length > 0 && selectedContact.length > 0) {
+        const response = await fetch(
+          `http://127.0.0.1:3000/api/v1/channel/create-channel`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name: channelName,
+              members: selectedContact.map((contact) => contact.value),
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (response.status === 201) {
+          setChannelName("");
+          setSelectedContact([]);
+          setNewChannelModel(false);
+          dispatch(addChannel(data.Channel));
+        }
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   return (
     <>

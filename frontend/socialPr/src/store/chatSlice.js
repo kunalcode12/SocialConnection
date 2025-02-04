@@ -9,6 +9,7 @@ const initialState = {
   isDownloading: false,
   fileUploadProgress: 0,
   fileDownloadProgress: 0,
+  channels: [],
 };
 
 export const chatSlice = createSlice({
@@ -38,6 +39,14 @@ export const chatSlice = createSlice({
     },
     setFileDownloadProgress: (state, action) => {
       state.fileDownloadProgress = action.payload;
+    },
+    setChannels: (state, action) => {
+      state.channels = action.payload;
+    },
+    addChannel: (state, action) => {
+      if (!action.payload) return;
+
+      state.channels = [action.payload, ...state.channels];
     },
     addMessage: (state, action) => {
       const formattedMessage = {
@@ -72,6 +81,8 @@ export const {
   setIsDownloading,
   setFileUploadProgress,
   setFileDownloadProgress,
+  setChannels,
   resetEvereything,
   addMessage,
+  addChannel,
 } = chatSlice.actions;
