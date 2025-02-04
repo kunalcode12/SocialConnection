@@ -5,6 +5,10 @@ const initialState = {
   selectedChatData: undefined,
   selectedChatMessages: [],
   directMessagesContacts: [],
+  isUploading: false,
+  isDownloading: false,
+  fileUploadProgress: 0,
+  fileDownloadProgress: 0,
 };
 
 export const chatSlice = createSlice({
@@ -23,7 +27,18 @@ export const chatSlice = createSlice({
     setDirectMessagesContacts: (state, action) => {
       state.directMessagesContacts = action.payload;
     },
-
+    setIsUploading: (state, action) => {
+      state.isUploading = action.payload;
+    },
+    setIsDownloading: (state, action) => {
+      state.isDownloading = action.payload;
+    },
+    setFileUploadProgress: (state, action) => {
+      state.fileUploadProgress = action.payload;
+    },
+    setFileDownloadProgress: (state, action) => {
+      state.fileDownloadProgress = action.payload;
+    },
     addMessage: (state, action) => {
       const formattedMessage = {
         ...action.payload,
@@ -53,6 +68,10 @@ export const {
   setSelectedChatType,
   setSelectedChatMessage,
   setDirectMessagesContacts,
+  setIsUploading,
+  setIsDownloading,
+  setFileUploadProgress,
+  setFileDownloadProgress,
   resetEvereything,
   addMessage,
 } = chatSlice.actions;

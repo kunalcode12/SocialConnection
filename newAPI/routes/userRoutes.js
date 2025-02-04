@@ -5,7 +5,7 @@ const router = express.Router();
 const multer = require('multer');
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 5MB max file size
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
 router.post('/signup', authController.signUp);
@@ -18,6 +18,7 @@ router.use(authController.protect);
 
 router.patch('/updateMyPassword', authController.updatePassword);
 router.route('/get-contacts-for-dm').get(userController.getContactForDMList);
+router.route('/get-all-contacts').get(userController.getAllContact);
 
 router
   .route('/profilePicture')

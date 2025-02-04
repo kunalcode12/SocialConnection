@@ -20,6 +20,8 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use(cors());
 
+app.use('/uploads/files', express.static('uploads/files'));
+
 app.use(cookieParser());
 app.use(express.json());
 

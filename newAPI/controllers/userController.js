@@ -566,8 +566,8 @@ exports.getContactForDMList = catchAsync(async (req, res, next) => {
       },
       {
         $project: {
-          userId: '$_id', // Change _id to userId in the projection
-          _id: 0, // Exclude the original _id
+          userId: '$_id',
+          _id: 0,
           lastMessageTime: 1,
           email: '$contactInfo.email',
           name: '$contactInfo.name',
@@ -582,5 +582,22 @@ exports.getContactForDMList = catchAsync(async (req, res, next) => {
     res.status(200).json({ contacts });
   } catch (error) {
     console.log('Error in code:', error);
+  }
+});
+
+exports.getAllContact = catchAsync(async (req, res, next) => {
+  try {
+    // const userId = req.user.id;
+    // console.log(userId);
+    const users = await User.find({ _id: { $ne: req.user.id } }, 'name _id');
+    const contacts = users.map((user) => ({
+      label: user.name,
+      value: user._id,
+    }));
+
+    res.status(200).json({ contacts });
+  } catch (error) {
+    console.log('Error in code:', error);
+    next(new AppError('Internal Server Error', 500));
   }
 });

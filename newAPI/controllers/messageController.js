@@ -1,6 +1,7 @@
 const Message = require('../models/messagesModel');
 const appError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const fs = require('fs');
 
 exports.getMessages = catchAsync(async (req, res, next) => {
   const user1 = req.user.id;
@@ -18,4 +19,24 @@ exports.getMessages = catchAsync(async (req, res, next) => {
   }).sort({ timestamp: 1 });
 
   res.status(200).json({ messages });
+});
+
+exports.uploadFile = catchAsync(async (req, res, next) => {
+  try {
+    if (!req.file) {
+      next(new appError('File is required', 400));
+    }
+
+    const date = Date.now();
+    let fileDir = `uploads/files/${date}`;
+    let fileName = `${fileDir}/${req.file.originalname}`;
+    fs.mkdirSync(fileDir, { recursive: true });
+
+    fs.renameSync(req.file.path, fileName);
+
+    res.status(200).json({ filePath: fileName });
+  } catch (error) {
+    console.log(error);
+    next(new appError('Internal Server Error', 500));
+  }
 });

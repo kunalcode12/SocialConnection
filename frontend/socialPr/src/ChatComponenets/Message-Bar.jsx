@@ -2,10 +2,13 @@ import { useSocket } from "@/context/socketContext";
 import EmojiPicker from "emoji-picker-react";
 import { Paperclip, SendHorizonal, SmilePlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import axios from "axios";
+import { setIsUploading, setFileUploadProgress } from "@/store/chatSlice";
 
 function MessageBar() {
   const emojiRef = useRef();
+  const fileInputRef = useRef();
   const [Message, setMessage] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const { user } = useSelector((state) => state.auth);
@@ -13,6 +16,7 @@ function MessageBar() {
     (state) => state.chat
   );
   const socket = useSocket();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -30,38 +34,11 @@ function MessageBar() {
     setMessage((msg) => msg + emoji.emoji);
   };
 
-  // console.log(user._id);
-  // console.log(selectedChatData.userId);
-  // console.log(Message);
-  // const handleSendMessage = async () => {
-  //   if (selectedChatType === "contact") {
-  //     console.log(selectedChatType);
-  //     try {
-  //       socket.emit("sendMessage", {
-  //         senders: user._id,
-  //         content: Message,
-  //         recipient: selectedChatData.userId,
-  //         messageType: "text",
-  //         fileUrl: undefined,
-  //       });
-  //     } catch (error) {
-  //       console.log(error);
-  //     }
-  //   }
-  // };
-
   const handleSendMessage = async () => {
     if (!Message.trim() || !selectedChatData) {
       console.log("Cannot send: empty message or no selected chat");
       return;
     }
-
-    // if (selectedChatType === "contact") {
-    //   console.log("Sending message:", {
-    //     senders: user._id,
-    //     content: Message,
-    //     recipient: selectedChatData.userId,
-    //   });
 
     try {
       if (selectedChatType === "contact") {
@@ -78,6 +55,54 @@ function MessageBar() {
     }
   };
 
+  const handleAttachmentClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleAttachmentChange = async (event) => {
+    try {
+      const file = event.target.files[0];
+
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file);
+        dispatch(setIsUploading(true));
+
+        const response = await axios.post(
+          `http://127.0.0.1:3000/api/v1/messages/upload-file`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            onUploadProgress: (data) => {
+              setFileUploadProgress(Math.round(100 * data.loaded) / data.total);
+            },
+          }
+        );
+
+        const data = response.data;
+        if (data) {
+          dispatch(setIsUploading(false));
+          if (selectedChatType === "contact") {
+            socket.emit("sendMessage", {
+              senders: user._id,
+              content: undefined,
+              recipient: selectedChatData.userId,
+              messageType: "file",
+              fileUrl: data.filePath,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      dispatch(setIsUploading(false));
+      console.log(error);
+    }
+  };
+
   return (
     <div className="h-[5vh] bg-[#1c1d25] flex justify-center items-center px-8 mb-6 gap-6">
       <div className="flex-1 flex bg-[#2a2b33] rounded-md items-center gap-5 pr-5">
@@ -88,9 +113,18 @@ function MessageBar() {
           value={Message}
           onChange={(e) => setMessage(e.target.value)}
         />
-        <button className="text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-300 transition-all">
+        <button
+          onClick={handleAttachmentClick}
+          className="text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-300 transition-all"
+        >
           <Paperclip className="text-2xl" />
         </button>
+        <input
+          type="file"
+          className="hidden"
+          ref={fileInputRef}
+          onChange={handleAttachmentChange}
+        />
         <div className="relative">
           <button
             onClick={() => setEmojiPickerOpen(true)}

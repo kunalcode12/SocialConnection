@@ -1,4 +1,5 @@
 import ContactList from "@/ChatComponenets/ContactList";
+import CreateChannel from "@/ChatComponenets/CreateChannel";
 import NewDm from "@/ChatComponenets/NewDm";
 import ProfileInfo from "@/ChatComponenets/ProfileInfo";
 import { setDirectMessagesContacts } from "@/store/chatSlice";
@@ -40,6 +41,7 @@ function ContactsContainer() {
       <div className="my-5">
         <div className="flex items-center justify-between pr-10">
           <Title text={"Channels"} />
+          <CreateChannel />
         </div>
       </div>
       <ProfileInfo />
