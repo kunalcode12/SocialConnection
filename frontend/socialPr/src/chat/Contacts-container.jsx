@@ -2,7 +2,7 @@ import ContactList from "@/ChatComponenets/ContactList";
 import CreateChannel from "@/ChatComponenets/CreateChannel";
 import NewDm from "@/ChatComponenets/NewDm";
 import ProfileInfo from "@/ChatComponenets/ProfileInfo";
-import { setDirectMessagesContacts } from "@/store/chatSlice";
+import { setDirectMessagesContacts, setChannels } from "@/store/chatSlice";
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -26,7 +26,26 @@ function ContactsContainer() {
         dispatch(setDirectMessagesContacts(data.contacts));
       }
     };
+
+    const getChannels = async () => {
+      const response = await fetch(
+        "http://127.0.0.1:3000/api/v1/channel/get-user-channels",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      // console.log(data);
+      if (data.channels) {
+        dispatch(setChannels(data.channels));
+      }
+    };
+
     getContacts();
+    getChannels();
   }, [dispatch]);
 
   return (

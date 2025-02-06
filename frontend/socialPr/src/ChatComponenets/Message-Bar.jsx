@@ -49,7 +49,16 @@ function MessageBar() {
           messageType: "text",
           fileUrl: undefined,
         });
+      } else if (selectedChatType === "channel") {
+        socket.emit("send-channel-message", {
+          senders: user._id,
+          content: Message,
+          messageType: "text",
+          fileUrl: undefined,
+          channelId: selectedChatData._id,
+        });
       }
+      setMessage("");
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -93,6 +102,14 @@ function MessageBar() {
               recipient: selectedChatData.userId,
               messageType: "file",
               fileUrl: data.filePath,
+            });
+          } else if (selectedChatType === "channel") {
+            socket.emit("send-channel-message", {
+              senders: user._id,
+              content: undefined,
+              messageType: "file",
+              fileUrl: data.filePath,
+              channelId: selectedChatData._id,
             });
           }
         }

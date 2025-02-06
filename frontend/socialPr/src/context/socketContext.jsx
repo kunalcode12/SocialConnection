@@ -1,6 +1,7 @@
 import { addMessage } from "@/store/chatSlice";
 import { createContext, useContext, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { addChannelInChannelList } from "@/store/chatSlice";
 import { io } from "socket.io-client";
 
 const SocketContext = createContext(null);
@@ -29,7 +30,6 @@ export const SocketProvider = ({ children }) => {
       socket.current.on("connect_error", (error) => {
         console.error("Socket connection error:", error);
       });
-      console.log(selectedChatData);
 
       const handleRecieveMessage = (message) => {
         // console.log("Received message full details:", message);
@@ -50,11 +50,23 @@ export const SocketProvider = ({ children }) => {
         }
       };
 
-      socket.current.on("recieveMessage", handleRecieveMessage);
+      const handleRecieveChannelMessage = (message) => {
+        if (
+          selectedChatType !== undefined &&
+          selectedChatData._id === message.channelId
+        ) {
+          console.log("Dispatching channel message to Redux store:", message);
+          dispatch(addMessage(message));
+        }
+        dispatch(addChannelInChannelList(message));
+      };
 
-      // return () => {
-      //   socket.current.disconnect();
-      // };
+      socket.current.on("recieveMessage", handleRecieveMessage);
+      socket.current.on("recieve-channel-message", handleRecieveChannelMessage);
+
+      return () => {
+        socket.current.disconnect();
+      };
     }
   }, [user, dispatch, selectedChatType, selectedChatData]);
 

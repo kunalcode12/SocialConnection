@@ -1,3 +1,4 @@
+const { default: mongoose } = require('mongoose');
 const Channel = require('../models/channelModel');
 const Message = require('../models/channelModel');
 const User = require('../models/userModel');
@@ -30,6 +31,46 @@ exports.createChannel = catchAsync(async (req, res, next) => {
 
     res.status(201).json({
       Channel: newChannel,
+    });
+  } catch (error) {
+    console.log({ error });
+    next(new AppError('Internal Server Error', 500));
+  }
+});
+
+exports.getUserChannel = catchAsync(async (req, res, next) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user.id);
+    const channels = await Channel.find({
+      $or: [{ admin: userId }, { members: userId }],
+    }).sort({ updatedAt: -1 });
+
+    res.status(201).json({
+      channels,
+    });
+  } catch (error) {
+    console.log({ error });
+    next(new AppError('Internal Server Error', 500));
+  }
+});
+
+exports.getChannelMessages = catchAsync(async (req, res, next) => {
+  try {
+    const { channelId } = req.params;
+
+    const channel = await Channel.findById(channelId).populate({
+      path: 'messages',
+      populate: { path: 'senders', select: 'name _id profilePicture' },
+    });
+
+    if (!channel) {
+      next(new AppError('Channel not found', 404));
+    }
+
+    const messages = channel.messages;
+
+    res.status(201).json({
+      messages,
     });
   } catch (error) {
     console.log({ error });

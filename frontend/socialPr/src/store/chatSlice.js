@@ -64,6 +64,22 @@ export const chatSlice = createSlice({
       state.selectedChatMessages.push(formattedMessage);
     },
 
+    addChannelInChannelList: (state, action) => {
+      const data = state.channels.find(
+        (channel) => channel._id === action.payload.channelId
+      );
+      const index = state.channels.findIndex(
+        (channel) => channel._id === action.payload.channelId
+      );
+
+      if (index !== -1 && index !== undefined) {
+        state.channels.splice(index, 1);
+        state.channels.unshift(data);
+      }
+    },
+
+    addContactsInDMContacts: (state, action) => {},
+
     resetEvereything: (state) => {
       state.selectedChatData = undefined;
       state.selectedChatType = undefined;
@@ -85,4 +101,5 @@ export const {
   resetEvereything,
   addMessage,
   addChannel,
+  addChannelInChannelList,
 } = chatSlice.actions;
