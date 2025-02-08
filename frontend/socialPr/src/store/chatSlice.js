@@ -78,7 +78,32 @@ export const chatSlice = createSlice({
       }
     },
 
-    addContactsInDMContacts: (state, action) => {},
+    addContactsInDMContacts: (state, action) => {
+      const userId = action.payload;
+      const fromId =
+        state.selectedChatData.senders._id === userId
+          ? state.selectedChatData.recipient._id
+          : state.selectedChatData.senders._id;
+
+      const fromData =
+        state.selectedChatData.senders._id === userId
+          ? state.selectedChatData.recipient
+          : state.selectedChatData.senders;
+
+      const dmContacts = state.directMessagesContacts;
+      const data = dmContacts.find((contact) => contact._id === fromId);
+      const index = dmContacts.findIndex((contact) => contact._id === fromId);
+      console.log({ data, index, dmContacts, userId, fromData });
+      if (index !== -1 && index !== undefined) {
+        console.log("in If condition");
+        dmContacts.splice(index, 1);
+        dmContacts.unshift(data);
+      } else {
+        console.log("in else condition");
+        dmContacts.unshift(fromData);
+      }
+      state.directMessagesContacts = dmContacts;
+    },
 
     resetEvereything: (state) => {
       state.selectedChatData = undefined;
@@ -102,4 +127,5 @@ export const {
   addMessage,
   addChannel,
   addChannelInChannelList,
+  addContactsInDMContacts,
 } = chatSlice.actions;

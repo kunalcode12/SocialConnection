@@ -23,37 +23,12 @@ const setupSocket = (server) => {
     }
   };
 
-  // const sendMessage = async (message) => {
-  //   console.log('Running!!');
-  //   const senderSocketId = userSocketMap.get(message.senders);
-  //   const recipientSocketId = userSocketMap.get(message.recipient);
-  //   console.log(senderSocketId);
-
-  //   const createdMessage = await Message.create(message);
-  //   console.log(createdMessage);
-  //   const messageData = await Message.findById(createdMessage._id)
-  //     .populate('senders', 'id email name profilePicture')
-  //     .populate('recipient', 'id email name profilePicture');
-
-  //   console.log(messageData);
-
-  //   if (recipientSocketId) {
-  //     io.to(recipientSocketId).emit('recieveMessage', messageData);
-  //   }
-  //   if (senderSocketId) {
-  //     io.to(senderSocketId).emit('recieveMessage', messageData);
-  //   }
-  // };
-
   const sendMessage = async (message) => {
     try {
       const createdMessage = await Message.create(message);
       const messageData = await Message.findById(createdMessage._id)
         .populate('senders', 'id email name profilePicture')
         .populate('recipient', 'id email name profilePicture');
-
-      // console.log(messageData);
-      // console.log(userSocketMap);
 
       const senderSocketId = userSocketMap.get(message.senders);
       const recipientSocketId = userSocketMap.get(message.recipient);

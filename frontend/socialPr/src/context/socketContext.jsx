@@ -1,7 +1,10 @@
 import { addMessage } from "@/store/chatSlice";
 import { createContext, useContext, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { addChannelInChannelList } from "@/store/chatSlice";
+import {
+  addChannelInChannelList,
+  addContactsInDMContacts,
+} from "@/store/chatSlice";
 import { io } from "socket.io-client";
 
 const SocketContext = createContext(null);
@@ -33,10 +36,6 @@ export const SocketProvider = ({ children }) => {
 
       const handleRecieveMessage = (message) => {
         // console.log("Received message full details:", message);
-        // console.log("Current selectedChatType:", selectedChatType);
-        // console.log("Current selectedChatData:", selectedChatData);
-        // console.log("Message senders:", message.senders);
-        // console.log("Message recipient:", message.recipient);
 
         if (
           selectedChatType !== undefined &&
@@ -48,6 +47,7 @@ export const SocketProvider = ({ children }) => {
         } else {
           console.log("Message not dispatched - conditions not met");
         }
+        dispatch(addContactsInDMContacts(message));
       };
 
       const handleRecieveChannelMessage = (message) => {
