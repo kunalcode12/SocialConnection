@@ -102,19 +102,16 @@ const EditPage = () => {
         setIsUploadLoading(true);
         const cleanContent = content.replace(/<p>/g, "").replace(/<\/p>/g, "");
 
-        // Prepare post data
         const postUpdateData = {
           title,
           description: cleanContent,
           url,
         };
 
-        // Handle media upload if a new file is selected
         let mediaUrl = originalMedia;
         let mediaId = post?.post.mediaId;
 
         if (mediaPreview && mediaPreview.file) {
-          // Ensure file is actually passed to updateMedia
           const uploadResponse = await mediaService.updateMedia(
             mediaId,
             mediaPreview.file, // Pass the actual file object
