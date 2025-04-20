@@ -417,13 +417,13 @@ export default function UserProfile() {
               {!isLoggedInUserProfile && (
                 <>
                   <FollowButton />
-                  <Button
+                  {/* <Button
                     variant="outline"
                     className="rounded-full px-6 hover:bg-gray-100 transition-colors"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
                     Message
-                  </Button>
+                  </Button> */}
                 </>
               )}
               {isLoggedInUserProfile && (
