@@ -135,7 +135,7 @@ export const login = (credentials) => async (dispatch) => {
 export const signup = (userData) => async (dispatch) => {
   try {
     dispatch(setLoading(true));
-    const response = await fetch("/api/signup", {
+    const response = await fetch("http://127.0.0.1:3000/api/v1/users/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(userData),
@@ -144,8 +144,15 @@ export const signup = (userData) => async (dispatch) => {
 
     if (!response.ok) throw new Error(data.message || "Signup failed");
 
+    // Format the data to match the expected structure in setCredentials
+    const mainUser = {
+      user: data.data.user,
+      token: data.token,
+    };
+
     localStorage.setItem("token", data.token);
-    dispatch(setCredentials(data));
+    dispatch(setCredentials(mainUser));
+    dispatch(setLoading(false));
   } catch (error) {
     dispatch(setError(error.message));
   }

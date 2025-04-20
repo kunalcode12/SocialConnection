@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Link2,
@@ -9,6 +9,7 @@ import {
   Eye,
   X,
   Check,
+  Loader,
 } from "lucide-react";
 import { Button } from "../components/UI/Button";
 import { Input } from "../components/UI/Input";
@@ -55,9 +56,42 @@ const EnhancedSubmitPage = () => {
   const [uploadedMediaUrl, setUploadedMediaUrl] = useState(null);
   const [mediaUploadInfo, setMediaUploadInfo] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [validationErrors, setValidationErrors] = useState({
+    title: false,
+    category: false,
+    content: false,
+    media: false,
+    link: false,
+  });
 
   const fileInputRef = useRef(null);
   const loading = useSelector((state) => state.post.loading);
+
+  // Clear success message after timeout
+  useEffect(() => {
+    let timer;
+    if (successMessage) {
+      timer = setTimeout(() => {
+        setSuccessMessage("");
+      }, 2000);
+    }
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  // Validation check
+  useEffect(() => {
+    setValidationErrors({
+      title: title.trim().length <= 1,
+      category: selectedCategory === "",
+      content: activeButton === "post" && content.trim().length <= 1,
+      media:
+        (activeButton === "image" || activeButton === "video") &&
+        !uploadedMediaUrl,
+      link: activeButton === "link" && link.trim().length === 0,
+    });
+  }, [title, content, activeButton, uploadedMediaUrl, link, selectedCategory]);
 
   // Chunk file into smaller pieces
   const chunkFile = (file) => {
@@ -77,6 +111,7 @@ const EnhancedSubmitPage = () => {
   // Media upload handler
   const handleMediaUpload = async (selectedFile) => {
     try {
+      setIsUploading(true);
       // Initialize upload
       const initResult = await mediaService.initializeUpload({
         title: selectedFile.name,
@@ -123,6 +158,8 @@ const EnhancedSubmitPage = () => {
       console.error("Media upload failed:", error);
       setErrorMessage(error.message);
       return null;
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -143,6 +180,25 @@ const EnhancedSubmitPage = () => {
   // Submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Check for validation errors
+    const currentErrors = {
+      title: title.trim().length <= 1,
+      category: selectedCategory === "",
+      content: activeButton === "post" && content.trim().length <= 1,
+      media:
+        (activeButton === "image" || activeButton === "video") &&
+        !uploadedMediaUrl,
+      link: activeButton === "link" && link.trim().length === 0,
+    };
+
+    setValidationErrors(currentErrors);
+
+    // If there are errors, don't submit
+    if (Object.values(currentErrors).some((error) => error)) {
+      return;
+    }
+
     if (isSubmitEnabled) {
       dispatch(setLoading(true));
       try {
@@ -180,7 +236,7 @@ const EnhancedSubmitPage = () => {
 
         dispatch(addPost(responseData.data.data));
         console.log("Post created:", responseData.data.data);
-        alert("Post submitted successfully!");
+        setSuccessMessage("Post submitted successfully!");
 
         // Reset form and media upload info
         setTitle("");
@@ -190,8 +246,12 @@ const EnhancedSubmitPage = () => {
         setUploadedMediaUrl(null);
         setUploadProgress(0);
         setMediaUploadInfo(null);
+        setSelectedCategory("");
 
-        navigate(`/user/${responseData.data.data.user}`);
+        // Navigate after a delay to allow the success message to be seen
+        setTimeout(() => {
+          navigate(`/user/${responseData.data.data.user}`);
+        }, 2000);
       } catch (error) {
         console.error("Error creating post:", error);
         dispatch(setError(error.message));
@@ -264,12 +324,26 @@ const EnhancedSubmitPage = () => {
         )}
       </AnimatePresence>
 
+      {/* Success message */}
+      <AnimatePresence>
+        {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-12 left-12 right-12 bg-green-500 text-white p-4 text-center z-50"
+          >
+            {successMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <h1 className="text-3xl font-bold mb-6 text-center">Create post</h1>
 
       <form onSubmit={handleSubmit} className="space-y-10">
         {/* Title Input */}
-        <div className="flex gap-4 items-center">
-          <div className="flex-1">
+        <div className="flex gap-4 items-center flex-col md:flex-row">
+          <div className="flex-1 w-full">
             <Input
               type="text"
               id="title"
@@ -277,40 +351,55 @@ const EnhancedSubmitPage = () => {
               value={title}
               name="title"
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-4 rounded-xl border"
+              className={`w-full p-4 rounded-xl border ${
+                validationErrors.title ? "border-red-500" : ""
+              }`}
               required
             />
+            {validationErrors.title && (
+              <p className="text-red-500 text-sm mt-1">Please enter a title</p>
+            )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-[180px] justify-between">
-                {selectedCategory || "Category"}
-                {selectedCategory && (
-                  <X
-                    className="w-4 h-4 ml-2 hover:text-red-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedCategory("");
-                    }}
-                  />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[180px]">
-              {categories.map((category) => (
-                <DropdownMenuItem
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className="flex items-center justify-between"
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`w-[180px] justify-between ${
+                    validationErrors.category ? "border-red-500" : ""
+                  }`}
                 >
-                  {category}
-                  {selectedCategory === category && (
-                    <Check className="w-4 h-4 ml-2" />
+                  {selectedCategory || "Category"}
+                  {selectedCategory && (
+                    <X
+                      className="w-4 h-4 ml-2 hover:text-red-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCategory("");
+                      }}
+                    />
                   )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[180px]">
+                {categories.map((category) => (
+                  <DropdownMenuItem
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className="flex items-center justify-between"
+                  >
+                    {category}
+                    {selectedCategory === category && (
+                      <Check className="w-4 h-4 ml-2" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {validationErrors.category && (
+              <p className="text-red-500 text-sm mt-1">Choose a category</p>
+            )}
+          </div>
         </div>
 
         {/* Content Type Buttons */}
@@ -334,13 +423,22 @@ const EnhancedSubmitPage = () => {
 
           {/* Content Area */}
           {activeButton === "post" && (
-            <Textarea
-              placeholder="Text (optional)"
-              value={content}
-              name="description"
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[190px] rounded-xl"
-            />
+            <div>
+              <Textarea
+                placeholder="Text (optional)"
+                value={content}
+                name="description"
+                onChange={(e) => setContent(e.target.value)}
+                className={`min-h-[190px] rounded-xl ${
+                  validationErrors.content ? "border-red-500" : ""
+                }`}
+              />
+              {validationErrors.content && (
+                <p className="text-red-500 text-sm mt-1">
+                  Please add some content
+                </p>
+              )}
+            </div>
           )}
 
           {/* Media Upload Area */}
@@ -355,16 +453,27 @@ const EnhancedSubmitPage = () => {
               />
 
               {!file && !uploadedMediaUrl ? (
-                <Button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full p-4 border-2 border-dashed"
-                >
-                  Upload {activeButton === "image" ? "Image" : "Video"}
-                </Button>
+                <div>
+                  <Button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-full p-4 border-2 border-dashed ${
+                      validationErrors.media ? "border-red-500" : ""
+                    }`}
+                  >
+                    Upload {activeButton === "image" ? "Image" : "Video"}
+                  </Button>
+                  {validationErrors.media && (
+                    <p className="text-red-500 text-sm mt-1">
+                      Please upload a{" "}
+                      {activeButton === "image" ? "image" : "video"}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div className="relative">
-                  {uploadProgress > 0 && uploadProgress < 100 && (
+                  {(isUploading ||
+                    (uploadProgress > 0 && uploadProgress < 100)) && (
                     <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
                       <div
                         className="bg-blue-600 h-2.5 rounded-full"
@@ -373,7 +482,18 @@ const EnhancedSubmitPage = () => {
                     </div>
                   )}
 
-                  {uploadedMediaUrl && (
+                  {isUploading && (
+                    <div className="flex items-center justify-center h-64 bg-gray-100 rounded-xl">
+                      <div className="flex flex-col items-center">
+                        <Loader className="w-8 h-8 animate-spin text-blue-600" />
+                        <p className="mt-2 text-gray-600">
+                          Uploading {activeButton}...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isUploading && uploadedMediaUrl && (
                     <div className="relative">
                       {activeButton === "image" ? (
                         <img
@@ -404,14 +524,23 @@ const EnhancedSubmitPage = () => {
 
           {/* Link Input */}
           {activeButton === "link" && (
-            <Input
-              type="url"
-              placeholder="Url"
-              name="link"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              className="w-full p-4 rounded-xl"
-            />
+            <div>
+              <Input
+                type="url"
+                placeholder="Url"
+                name="link"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className={`w-full p-4 rounded-xl ${
+                  validationErrors.link ? "border-red-500" : ""
+                }`}
+              />
+              {validationErrors.link && (
+                <p className="text-red-500 text-sm mt-1">
+                  Please enter a valid URL
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -433,10 +562,14 @@ const EnhancedSubmitPage = () => {
           <Button
             type="submit"
             className={submitButtonClass}
-            disabled={!isSubmitEnabled}
+            disabled={!isSubmitEnabled || isUploading || loading}
           >
-            <Send className="w-4 h-4 mr-2" />
-            {!loading ? "Post" : "Posting..."}
+            {loading || isUploading ? (
+              <Loader className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4 mr-2" />
+            )}
+            {loading ? "Posting..." : isUploading ? "Uploading..." : "Post"}
           </Button>
         </div>
       </form>

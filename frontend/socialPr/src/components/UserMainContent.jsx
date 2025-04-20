@@ -54,7 +54,7 @@ export default function UserMainContent() {
   const renderUserPost = useCallback(
     (post, isBookmarkedPost = false) => {
       const postUserId = isBookmarkedPost
-        ? post.user._id
+        ? post.user?._id
         : renderData?.userData.Id;
       const postUserName = isBookmarkedPost
         ? post.user.name

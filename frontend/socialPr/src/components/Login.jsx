@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "./UI/Button";
 import { Input } from "./UI/Input";
 import { Label } from "./UI/Label";
-import { X, Apple, Facebook } from "lucide-react";
+import { X } from "lucide-react";
 import { Form } from "react-router-dom";
 import { login, clearError, initializeAuthAsync } from "../store/authSlice";
 
@@ -45,7 +45,7 @@ function LoginPopup({ isOpen, setIsOpen }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md relative">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md relative max-h-[90vh] overflow-auto">
         <button
           onClick={() => setIsOpen(false)}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -57,29 +57,6 @@ function LoginPopup({ isOpen, setIsOpen }) {
           By continuing, you agree to our User Agreement and Privacy Policy.
         </p>
         <Form onSubmit={handleSubmit} className="space-y-4">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-start"
-          >
-            Continue with Google
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-start"
-          >
-            <Apple className="mr-2 h-4 w-4" />
-            Continue with Apple
-          </Button>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">Or</span>
-            </div>
-          </div>
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
             <Input
@@ -114,22 +91,6 @@ function LoginPopup({ isOpen, setIsOpen }) {
             </a>
             ?
           </p>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">Or</span>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-start"
-          >
-            <Facebook className="mr-2 h-4 w-4" />
-            Continue with Facebook
-          </Button>
         </Form>
       </div>
     </div>

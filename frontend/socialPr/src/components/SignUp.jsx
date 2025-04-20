@@ -1,18 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "./UI/Button";
 import { Input } from "./UI/Input";
+import { useDispatch, useSelector } from "react-redux";
+import { signup, clearError } from "../store/authSlice";
 
-function SignupPopup({ isOpen, setIsOpen, onSignup }) {
-  if (!isOpen) return null;
+function SignupPopup({ isOpen, setIsOpen }) {
+  const dispatch = useDispatch();
+  const { loading, error, isAuthenticated } = useSelector(
+    (state) => state.auth
+  );
 
-  const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setIsOpen(false);
+    }
+  }, [isAuthenticated, setIsOpen]);
+
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSignup(username, email, password);
+
+    const userData = {
+      name,
+      email,
+      password,
+      passwordConfirm,
+    };
+
+    dispatch(signup(userData));
   };
 
   return (
@@ -30,16 +58,16 @@ function SignupPopup({ isOpen, setIsOpen, onSignup }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
-              htmlFor="username"
+              htmlFor="name"
               className="block text-sm font-medium text-gray-700"
             >
-              Username
+              Name
             </label>
             <Input
               type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
               className="mt-1 block w-full"
             />
@@ -76,8 +104,25 @@ function SignupPopup({ isOpen, setIsOpen, onSignup }) {
               className="mt-1 block w-full"
             />
           </div>
-          <Button type="submit" className="w-full">
-            Sign Up
+          <div>
+            <label
+              htmlFor="passwordConfirm"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Confirm Password
+            </label>
+            <Input
+              type="password"
+              id="passwordConfirm"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              required
+              className="mt-1 block w-full"
+            />
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Signing up..." : "Sign Up"}
           </Button>
         </form>
       </div>
